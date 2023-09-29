@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import chi2, f_regression
 
 
 def load_w6(core_data_path="wave_6_elsa_data_v2.tab", nurse_data_path="wave_6_elsa_nurse_data_v2.tab"):
@@ -15,7 +17,7 @@ def load_w6(core_data_path="wave_6_elsa_data_v2.tab", nurse_data_path="wave_6_el
 
 def frailty_level_w6(sex, height, weight, grip_strength, walking_time, exhaustion, activity_level):
     """
-    Calculates Freid's frailty phenotype starting from wave 6 ELSA merged database.
+    Calculates Fried's frailty phenotype starting from wave 6 ELSA merged database.
     Returns: -1 if unable to calculate;
     1 if subject is not frail;
     2 if subject is pre-frail;
@@ -72,9 +74,9 @@ def frailty_level_w6(sex, height, weight, grip_strength, walking_time, exhaustio
         return 3
 
 
-def add_fried_w6(elsa_w6_merged, drop_columns=False):
+def add_fried_w6(elsa_w6_merged, drop_columns=False, drop_rows=False):
     """
-    Calculates Freid's Frailty Phenotype starting from wave 6 ELSA merged database.
+    Calculates Fried's Frailty Phenotype starting from wave 6 ELSA merged database.
     Returns the dataframe with an added column called 'FFP', with following values:
     -1 if unable to calculate;
     1 if subject is not frail;
@@ -83,6 +85,7 @@ def add_fried_w6(elsa_w6_merged, drop_columns=False):
 
     elsa_w6_merged: DataFrame of ELSA wave 6 with core data and nurse visit merged
     drop_columns: if True deletes the columns used for FFP computation
+    drop_rows: if True deletes the rows for which FFP could not be calculated
     """
 
     elsa_w6_merged['FFP'] = elsa_w6_merged.apply(lambda row: frailty_level_w6(sex=row.indsex,
@@ -102,7 +105,29 @@ def add_fried_w6(elsa_w6_merged, drop_columns=False):
                                      'PScedB', 'PScedH',
                                      'HeActa', 'HeActb', 'HeActc'])
 
+    if drop_rows:
+        elsa_w6_merged = elsa_w6_merged.loc[elsa_w6_merged['FFP'] > 0]
+
     return elsa_w6_merged
+
+
+def feature_selection_w6(frailty_dataframe, frailty_variable='FFP', score_func=chi2, k=100):
+    """
+    Returns a dataframe with k best feature and the frailty variable
+    :param frailty_dataframe: df from which features are selected
+    :param frailty_variable: frailty target variable contained in frailty_dataframe
+    :param score_func: what function to use to find the k-best variables
+    :param k: number of variables to select
+    :return: dataframe
+    """
+    variables = list(frailty_dataframe.columns.values)
+    variables.remove(frailty_variable)
+    x = frailty_dataframe.loc[:, variables]
+    y = frailty_dataframe.loc[:, frailty_variable]
+    select = SelectKBest(score_func=score_func, k=k)
+    best_features_dataframe = select.fit_transform(x, y)
+    print(type(best_features_dataframe), best_features_dataframe.shape, best_features_dataframe[-1])
+    return best_features_dataframe
 
 
 if __name__ == '__main__':
@@ -110,7 +135,10 @@ if __name__ == '__main__':
 
     core_data_path = "data/wave_6_elsa_data_v2.tab"
     nurse_data_path = "data/wave_6_elsa_nurse_data_v2.tab"
-    fried = add_fried_w6(elsa_w6_merged=load_w6(core_data_path=core_data_path, nurse_data_path=nurse_data_path))
+    fried = add_fried_w6(elsa_w6_merged=load_w6(core_data_path=core_data_path, nurse_data_path=nurse_data_path), drop_columns=True, drop_rows=True)
     fried.to_csv('data/wave_6_frailty_FFP_data.tab', sep='\t', index=False, quoting=3, escapechar='\\')
+
+    # fried = pd.read_csv(filepath_or_buffer='data/wave_6_frailty_FFP_data.tab', sep='\t', lineterminator='\n', header=(0), low_memory=False)
+    # feature_selection_w6(frailty_dataframe=fried)
 
     print("All done!")
