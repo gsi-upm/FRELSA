@@ -3,8 +3,11 @@ import pandas as pd
 from sklearn.feature_selection import SelectKBest
 from sklearn.feature_selection import chi2, f_regression
 
+pd.options.mode.chained_assignment = None
 
-def load_w6(core_data_path="wave_6_elsa_data_v2.tab", nurse_data_path="wave_6_elsa_nurse_data_v2.tab"):
+
+def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
+            nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab"):
     """
     Loads core data and nurse visit data from wave 6 and merges them into a single pandas dataframe.
     """
@@ -111,34 +114,80 @@ def add_fried_w6(elsa_w6_merged, drop_columns=False, drop_rows=False):
     return elsa_w6_merged
 
 
+def group_pre_frailty(frailty_dataframe, frailty_column="FFP"):
+    """
+
+    :param frailty_dataframe: pd.DataFrame with a frailty column
+    :param frailty_column: frailty variable (1=non-frail, 2=pre-frail, 3=frail)
+    :return: pd.DataFrame with binary column (1=non-frail, 2=pre-frail + frail
+    """
+    result = [min(frailty_dataframe.loc[x, frailty_column], 2) for x in frailty_dataframe[frailty_column]]
+    frailty_dataframe[frailty_column] = np.array(result)
+    return frailty_dataframe
+
+
+def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negatives=True):
+    """
+    Replaces str entries and negative floats with 0
+
+    :param replace_negatives: Boolean, whether to replace negative values with 0 or not, default=True
+    :param regex_list: list of regular expressions to replace
+    :param frailty_dataframe: pd.DataFrame with frailty column
+    :return: pd.DataFrame with zeroes instead of strings and negatives
+    """
+
+    if regex_list is None:
+        regex_list = ["\s",
+                      ".*:.*:.*", ".*-.*-.*",
+                      #"A.*", "B.*", "C.*", "D.*", "E.*", "N.*", "P.*", "R.*", "S.*", "T.*", "V.*",
+                      "[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]"]
+    frailty_dataframe.replace(to_replace=regex_list, value=0, inplace=True, regex=True)
+    if replace_negatives:
+        frailty_dataframe.replace(to_replace=[i for i in range(-1, -10, -1)] + [str(i) for i in range(-1, -10, -1)],
+                                  value=0, inplace=True)
+    return frailty_dataframe
+
+
 def feature_selection_w6(frailty_dataframe, frailty_variable='FFP', score_func=chi2, k=100):
     """
     Returns a dataframe with k best feature and the frailty variable
+
     :param frailty_dataframe: df from which features are selected
     :param frailty_variable: frailty target variable contained in frailty_dataframe
     :param score_func: what function to use to find the k-best variables
     :param k: number of variables to select
-    :return: dataframe
+    :return: dataframe with the k-best variables
     """
+
     variables = list(frailty_dataframe.columns.values)
     variables.remove(frailty_variable)
     x = frailty_dataframe.loc[:, variables]
     y = frailty_dataframe.loc[:, frailty_variable]
     select = SelectKBest(score_func=score_func, k=k)
-    best_features_dataframe = select.fit_transform(x, y)
-    print(type(best_features_dataframe), best_features_dataframe.shape, best_features_dataframe[-1])
+    select.fit_transform(x, y)
+    cols_idxs = select.get_support(indices=True)
+    best_features_dataframe = frailty_dataframe.iloc[:, cols_idxs]
+    best_features_dataframe[frailty_variable] = frailty_dataframe[frailty_variable]
     return best_features_dataframe
+
+
 
 
 if __name__ == '__main__':
     print("Starting process...")
 
-    core_data_path = "data/wave_6_elsa_data_v2.tab"
-    nurse_data_path = "data/wave_6_elsa_nurse_data_v2.tab"
-    fried = add_fried_w6(elsa_w6_merged=load_w6(core_data_path=core_data_path, nurse_data_path=nurse_data_path), drop_columns=True, drop_rows=True)
-    fried.to_csv('data/wave_6_frailty_FFP_data.tab', sep='\t', index=False, quoting=3, escapechar='\\')
+    # core_data_path = "data/wave_6_elsa_data_v2.tab"
+    # nurse_data_path = "data/wave_6_elsa_nurse_data_v2.tab"
+    # fried = add_fried_w6(elsa_w6_merged=load_w6(core_data_path=core_data_path, nurse_data_path=nurse_data_path), drop_columns=True, drop_rows=True)
+    # fried.to_csv('data/wave_6_frailty_FFP_data.tab', sep='\t', index=False, quoting=3, escapechar='\\')
 
-    # fried = pd.read_csv(filepath_or_buffer='data/wave_6_frailty_FFP_data.tab', sep='\t', lineterminator='\n', header=(0), low_memory=False)
-    # feature_selection_w6(frailty_dataframe=fried)
+    fried = pd.read_csv(filepath_or_buffer='data/raw/wave_6_frailty_FFP_data.tab', sep='\t', lineterminator='\n', header=0, low_memory=False)
+    fried = replace_missing_values_w6(fried)
+    print(fried.shape)
+
+    fried = group_pre_frailty(fried)
+    selected_fried = feature_selection_w6(frailty_dataframe=fried, score_func=chi2, k=50)
+    print(selected_fried.shape)
+    print(selected_fried.columns)
 
     print("All done!")

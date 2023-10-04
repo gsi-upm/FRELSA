@@ -6,5 +6,5 @@ import pandas as pd
 
 if __name__ == '__main__':
     print("Initializing...")
-    df = pd.read_csv("data/wave_6_frailty_FFP_data.tab", sep='\t', lineterminator='\n', header=(0), low_memory=False)
+    df = pd.read_csv("data/raw/wave_6_frailty_FFP_data.tab", sep='\t', lineterminator='\n', header=(0), low_memory=False)
     print(df.shape, df.columns.values[-1])
