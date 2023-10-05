@@ -1,9 +1,14 @@
 import numpy as np
 import pandas as pd
 from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import chi2, f_regression
+from sklearn.feature_selection import chi2, f_classif
 
 pd.options.mode.chained_assignment = None
+
+function_dict= {
+    "chi2": chi2,
+    "f_classif": f_classif
+}
 
 
 def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
@@ -163,6 +168,8 @@ def feature_selection_w6(frailty_dataframe, frailty_variable='FFP', score_func=c
     variables.remove(frailty_variable)
     x = frailty_dataframe.loc[:, variables]
     y = frailty_dataframe.loc[:, frailty_variable]
+    if type(score_func) == str:
+        score_func = function_dict[score_func]
     select = SelectKBest(score_func=score_func, k=k)
     select.fit_transform(x, y)
     cols_idxs = select.get_support(indices=True)
@@ -171,22 +178,35 @@ def feature_selection_w6(frailty_dataframe, frailty_variable='FFP', score_func=c
     return best_features_dataframe
 
 
+def save_selected_w6(selected_frailty_dataframe, function="", k="", folder="data/best_features/"):
+    """
+
+    :param selected_frailty_dataframe:
+    :param function:
+    :param k:
+    :param folder:
+    :return:
+    """
+    selected_frailty_dataframe.to_csv(folder + "w6_frailty_selected_" + str(k) + "_features_" + str(function) + ".tab",
+                                      sep='\t', index=False, quoting=3, escapechar='\\')
+    return selected_frailty_dataframe
+
 
 
 if __name__ == '__main__':
     print("Starting process...")
-
-    # core_data_path = "data/wave_6_elsa_data_v2.tab"
-    # nurse_data_path = "data/wave_6_elsa_nurse_data_v2.tab"
-    # fried = add_fried_w6(elsa_w6_merged=load_w6(core_data_path=core_data_path, nurse_data_path=nurse_data_path), drop_columns=True, drop_rows=True)
-    # fried.to_csv('data/wave_6_frailty_FFP_data.tab', sep='\t', index=False, quoting=3, escapechar='\\')
 
     fried = pd.read_csv(filepath_or_buffer='data/raw/wave_6_frailty_FFP_data.tab', sep='\t', lineterminator='\n', header=0, low_memory=False)
     fried = replace_missing_values_w6(fried)
     print(fried.shape)
 
     fried = group_pre_frailty(fried)
-    selected_fried = feature_selection_w6(frailty_dataframe=fried, score_func=chi2, k=50)
+
+    selection_function = "f_classif"
+    k = 50
+    selected_fried = feature_selection_w6(frailty_dataframe=fried, score_func=selection_function, k=k)
+    save_selected_w6(selected_frailty_dataframe=selected_fried, function=selection_function, k=k,
+                     folder="data/best_features/")
     print(selected_fried.shape)
     print(selected_fried.columns)
 
