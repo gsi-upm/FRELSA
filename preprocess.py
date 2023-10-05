@@ -10,6 +10,60 @@ function_dict= {
     "f_classif": f_classif
 }
 
+variables_dict = {
+    'hastro': "LUNG: Whether been admitted to hospital with a heart complaint in the past month?",
+    'LFTB': "LUNG: Whether currently taking any medications for the treatment of tuberculosis?",
+    'LungEx': "LUNG: Derived: Excluded from lung function test",
+    'NoLung': "LUNG: Respondent not eligible for a lung function test",
+    'NoAttLF1': "LUNG: Why unable to take reading: Respondent is breathless",
+    'NoAttLF2': "LUNG: Why unable to take reading: Respondent is unwell",
+    'NoAttLF3': "LUNG: Why unable to take reading: Respondent upset/anxious/nervous",
+    'NoAttLF9': "LUNG: Why unable to take reading: Other reason",
+    'LFSmok': "LUNG: Whether smoked in the last 24 hours",
+    'LFSmHr': "LUNG: How many hours ago last smoked",
+    'inhaler': "LUNG: Whether used an inhaler, puffer or any medication for breathing in the last 24 hours",
+    'inhalhrs': "LUNG: How many hours ago last used an inhaler, puffer or any medication for breathing",
+    'chestinf': "LUNG: Whether had any respiratory infections such as influenza, pneumonia, bronchitis or a severe cold, in the past three weeks",
+    'htfvc': "LUNG: Highest technically satisfactory value for FVC",
+    'PRFVC': "LUNG: Predicted value for FVC",
+    'PCFVC': "LUNG: FVC as percentage of predicted FVC",
+    'htfev': "LUNG: Highest technically satisfactory value for FEV",
+    'PRFEV': "LUNG: Predicted value for FEV",
+    'PCFEV': "LUNG: FEV as percentage of predicted FEV",
+    'HTPEF': "LUNG: Highest technically satisfactory value for PEF",
+    'PRPEF': "LUNG: Predicted value for PEF",
+    'PCPEF': "LUNG: PEF as percentage of predicted PEF",
+    'Quality': "LUNG: Derived: Outcome from lung function software (A - F)",
+    'SYSVAL': "(D) Valid Mean Systolic BP",
+    'DIAVAL': "(D) Valid Mean Diastolic BP",
+    'PULVAL': "",
+    'MAPVAL': "",
+    'BSOUTC': "",
+    'HTOK': "",
+    'HTVAL': "",
+    'WTOK': "",
+    'WTVAL': "",
+    'BMI': "",
+    'BMIOK': "",
+    'BMIVAL': "",
+    'BMIOBE': "",
+    'WSTOKB': "",
+    'WSTVAL': "",
+    'MMRROC': "",
+    'MMFTRE2': "",
+    'bpconst': "",
+    'bswill': "",
+    'LFWill': "",
+    'w6nurwt': "",
+    'w6bldwt': "",
+    'vismon': "",
+    'visyear': "",
+    'finstat': "",
+    'Indobyr_y': "",
+    'indager\r': "",
+    'FFP': "",
+}
+
 
 def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
             nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab"):
@@ -131,10 +185,11 @@ def group_pre_frailty(frailty_dataframe, frailty_column="FFP"):
     return frailty_dataframe
 
 
-def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negatives=True):
+def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negatives=True, replace_nan=True):
     """
     Replaces str entries and negative floats with 0
 
+    :param replace_nan: Boolean, whether to replace NaN and None values with 0 or not, default=True
     :param replace_negatives: Boolean, whether to replace negative values with 0 or not, default=True
     :param regex_list: list of regular expressions to replace
     :param frailty_dataframe: pd.DataFrame with frailty column
@@ -145,12 +200,41 @@ def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negati
         regex_list = ["\s",
                       ".*:.*:.*", ".*-.*-.*",
                       #"A.*", "B.*", "C.*", "D.*", "E.*", "N.*", "P.*", "R.*", "S.*", "T.*", "V.*",
-                      "[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]"]
+                      "[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]",
+                      ]
     frailty_dataframe.replace(to_replace=regex_list, value=0, inplace=True, regex=True)
+    frailty_dataframe = frailty_dataframe.astype(float)
     if replace_negatives:
         frailty_dataframe.replace(to_replace=[i for i in range(-1, -10, -1)] + [str(i) for i in range(-1, -10, -1)],
                                   value=0, inplace=True)
+    if replace_nan:
+        frailty_dataframe.fillna(0, inplace=True)
+        frailty_dataframe.replace(to_replace=np.nan, value=0, inplace=True)
     return frailty_dataframe
+
+
+def dumb(value):
+    if type(value) == str:
+        print(value)
+    if value == np.nan:
+        print("NaN found!")
+
+
+def min_max_scaling(frailty_dataframe, frailty_variable='FFP'):
+    """
+
+    :param frailty_dataframe: pandas DataFrame containing a frailty variable
+    :param frailty_variable: name of the column containing the frailty variable
+    :return: pandas DataFrame scaled with min-max, except frailty variable
+    """
+    variables = list(frailty_dataframe.columns.values)
+    variables.remove(frailty_variable)
+    x = frailty_dataframe.loc[:, variables]
+    y = frailty_dataframe.loc[:, frailty_variable]
+    x_scaled = (x - x.min()) / (x.max() - x.min())
+    x_scaled.fillna(0, inplace=True)
+    x_scaled[frailty_variable] = np.array(y)
+    return x_scaled
 
 
 def feature_selection_w6(frailty_dataframe, frailty_variable='FFP', score_func=chi2, k=100):
@@ -192,17 +276,19 @@ def save_selected_w6(selected_frailty_dataframe, function="", k="", folder="data
     return selected_frailty_dataframe
 
 
-
 if __name__ == '__main__':
     print("Starting process...")
 
     fried = pd.read_csv(filepath_or_buffer='data/raw/wave_6_frailty_FFP_data.tab', sep='\t', lineterminator='\n', header=0, low_memory=False)
-    fried = replace_missing_values_w6(fried)
+    fried = replace_missing_values_w6(frailty_dataframe=fried, replace_nan=True, replace_negatives=True)
     print(fried.shape)
 
-    fried = group_pre_frailty(fried)
+    fried = group_pre_frailty(frailty_dataframe=fried)
+    fried = min_max_scaling(frailty_dataframe=fried, frailty_variable="FFP")
 
-    selection_function = "f_classif"
+    fried.apply(np.vectorize(dumb))
+
+    selection_function = "chi2"
     k = 50
     selected_fried = feature_selection_w6(frailty_dataframe=fried, score_func=selection_function, k=k)
     save_selected_w6(selected_frailty_dataframe=selected_fried, function=selection_function, k=k,
