@@ -2,9 +2,6 @@ import numpy as np
 import pandas as pd
 from CFSmethod import CFS
 from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif, RFE
-from sklearn.svm import SVR
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression, SGDClassifier
 
 pd.options.mode.chained_assignment = None
 
@@ -118,8 +115,6 @@ variables_dict = {
     'WPAskE': "Computed : Ask WpEst or not",
     'hofuelel': "Fuels used in household for heating or other purpose - electricity",
     'difbpcno': "BPRESS: Problems taking BP readings: No problems taking blood pressure",
-
-
 
     'FFP': "Fried's Frailty Phenotype",
 }
@@ -394,7 +389,8 @@ def joint_feature_selection_df(X, y, score_functions=[chi2, f_classif, mutual_in
     return X.iloc[:, selected_variables]
 
 
-def save_selected_df(selected_X, y, frailty_column_name="FFP", function="", k="", iterations="", folder="data/best_features/", wave=""):
+def save_selected_df(selected_X, y, frailty_column_name="FFP", function="", k="", iterations="",
+                     folder="data/best_features/", wave=""):
     """
     Save a .tab file after variable selection
 
@@ -408,12 +404,13 @@ def save_selected_df(selected_X, y, frailty_column_name="FFP", function="", k=""
     saving_X = selected_X.copy()
     saving_X[frailty_column_name] = y
     if iterations == "":
-        selected_X.to_csv(
+        saving_X.to_csv(
             folder + str(wave) + "_frailty_selected_" + str(k) + "_features_" + str(function) + ".tab",
             sep='\t', index=False, quoting=3, escapechar='\\')
     else:
-        selected_X.to_csv(
-            folder + str(wave) + "_frailty_selected_" + str(k) + "_features_" + str(function) + "_" + str(iterations) + "_iterations" + ".tab",
+        saving_X.to_csv(
+            folder + str(wave) + "_frailty_selected_" + str(k) + "_features_" + str(function) + "_" + str(
+                iterations) + "_iterations" + ".tab",
             sep='\t', index=False, quoting=3, escapechar='\\')
     return selected_X
 
@@ -435,7 +432,7 @@ if __name__ == '__main__':
     X, y = separate_target_variable(df=fried, target_variable=frailty_variable)
     X = min_max_scaling(X=X)
     # Feature selection
-    k = 30
+    k = 50
     selection_functions = ["chi2", "f_classif", "mutual_info_classif"]
     selected_X = joint_feature_selection_df(X=X, y=y, score_functions=selection_functions, k=k)
     save_selected_df(selected_X=selected_X, y=y, frailty_column_name=frailty_variable,
