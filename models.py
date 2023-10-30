@@ -1,8 +1,6 @@
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, precision_score, f1_score
@@ -77,7 +75,7 @@ def get_classifiers_metrics(X_train, X_test, y_train, y_test, random_state=None)
 if __name__ == '__main__':
     print("Starting process...")
     data_file = 'w6_frailty_selected_56_features_chi2+f_classif+mutual_info_classif.tab'
-    # data_file = 'w6_frailty_selected_50_features_mutual_info_classif.tab'
+    # data_file = 'w6_frailty_selected_50_features_f_classif.tab'
     folder_path = 'data/best_features/'
     frailty_variable = "FFP"
     random_state = 10
