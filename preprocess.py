@@ -106,21 +106,60 @@ variables_dict = {
 
 
 def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
-            nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab", remove_duplicates=True):
+            nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab", remove_duplicates=True, index_col="idauniq"):
     """
     Loads core data and nurse visit data from wave 6 and merges them into a single pandas dataframe.
+    :param index_col:
     :param remove_duplicates: {Boolean} if True, remove duplicate columns from the two dataframes
     :param core_data_path: {string} path to Elsa wave 6 core raw data
     :param nurse_data_path: {string} path to Elsa wave 6 nurse visit raw data
     :return: merged {pandas DataFrame}, merged dataframe on the identification column 'idauniq'
     """
 
-    nurse = pd.read_csv(nurse_data_path, sep='\t', lineterminator='\n', header=(0))
-    main = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), low_memory=False)
-    merged = main.merge(right=nurse, on='idauniq', suffixes=('', '_y'))
+    nurse = pd.read_csv(nurse_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col)
+    main = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
+    merged = main.merge(right=nurse, on=index_col, suffixes=('', '_y'))
     if remove_duplicates:
         merged.drop(merged.filter(regex='_y$').columns, axis=1, inplace=True)
     return merged
+
+
+def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=None, acceptable_idauniq=None):
+    df = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col='idauniq', low_memory=False)
+    if (acceptable_features is None) and (acceptable_idauniq is None):
+        return df
+    if not (acceptable_features is None):
+        acceptable_features = np.array(set(df.columns) & set(acceptable_features))
+        df = df.loc[:, acceptable_features]
+        if acceptable_idauniq is None:
+            return df
+    # acceptable_idauniq = np.array(set(df['idauniq']) & set(acceptable_idauniq))
+    df = df.filter(items=acceptable_idauniq, axis=0)
+    return df
+
+
+def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", older_df_label="w5", frailty_df_label="w6"):
+    """
+
+    :param older_df:
+    :param frailty_df:
+    :param frailty_variable:
+    :param older_df_label:
+    :param frailty_df_label:
+    :return:
+    """
+    frailty_df = frailty_df.filter(items=np.array(older_df.index), axis=0)
+    frailty_df, y = separate_target_variable(df=frailty_df, target_variable=frailty_variable)
+    frailty_df = frailty_df.loc[:, older_df.columns]
+    older_df = replace_missing_values_w6(frailty_dataframe=older_df, replace_nan=True, replace_negatives=True)
+    older_df = remove_constant_features(older_df)
+    older_df = min_max_scaling(older_df)
+    frailty_df["wave"] = np.array([frailty_df_label for i in range(frailty_df.shape[0])])
+    frailty_df.set_index("wave", append=True, inplace=True)
+    older_df["wave"] = np.array([older_df_label for i in range(older_df.shape[0])])
+    older_df.set_index("wave", append=True, inplace=True)
+    final = pd.concat([older_df, frailty_df]).sort_index()
+    return final, y
 
 
 def frailty_level_w6(sex, height, weight, grip_strength, walking_time, exhaustion, activity_level):
@@ -394,12 +433,12 @@ def save_selected_df(selected_X, y, frailty_column_name="FFP", function="", k=""
     if iterations == "":
         saving_X.to_csv(
             folder + str(wave) + "_frailty_selected_" + str(k) + "_features_" + str(function) + ".tab",
-            sep='\t', index=False, quoting=3, escapechar='\\')
+            sep='\t', index_label='idauniq', quoting=3, escapechar='\\')
     else:
         saving_X.to_csv(
             folder + str(wave) + "_frailty_selected_" + str(k) + "_features_" + str(function) + "_" + str(
                 iterations) + "_iterations" + ".tab",
-            sep='\t', index=False, quoting=3, escapechar='\\')
+            sep='\t', index_label='idauniq', quoting=3, escapechar='\\')
     return selected_X
 
 
@@ -407,7 +446,7 @@ if __name__ == '__main__':
     print("Starting process...")
 
     fried = pd.read_csv(filepath_or_buffer='data/raw/wave_6_frailty_FFP_data.tab', sep='\t', lineterminator='\n',
-                        header=0, low_memory=False)
+                        header=0, low_memory=False, index_col="idauniq")
     print(fried.shape)
     frailty_variable = "FFP"
     # Preprocess data
@@ -421,17 +460,12 @@ if __name__ == '__main__':
     X = min_max_scaling(X=X)
     # Feature selection
     k = 50
-    selection_functions = ["chi2", "f_classif", "mutual_info_classif"]
+    selection_functions = ["mutual_info_classif"]  # ["chi2", "f_classif", "mutual_info_classif"]
     selected_X = joint_feature_selection_df(X=X, y=y, score_functions=selection_functions, k=k)
     save_selected_df(selected_X=selected_X, y=y, frailty_column_name=frailty_variable,
-                     function="chi2+f_classif+mutual_info_classif", k=selected_X.shape[1],
+                     function="_".join([str(f) for f in selection_functions]), k=selected_X.shape[1],
                      folder="data/best_features/", wave="w6")
     print(selected_X.shape)
     print(selected_X.columns)
 
-    # model = SVR(kernel="linear")
-    # # model = LogisticRegression()
-    # selector = RFE(estimator=model, n_features_to_select=k, step=1)
-    # selector = selector.fit(X, y)
-    # selected_X = X.iloc[:, (selector.support_)]
     print("All done!")

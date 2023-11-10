@@ -21,7 +21,7 @@ classifiers = {"SVM_linear": SVC(kernel='linear', C=0.2),
                }
 
 
-def load_data(file_name, folder_path='data/best_features/', target_variable='FFP'):
+def load_data(file_name, folder_path='data/best_features/', target_variable='FFP', index=None):
     """
     Loads a Dataframe and returns X and y
 
@@ -30,7 +30,12 @@ def load_data(file_name, folder_path='data/best_features/', target_variable='FFP
     :param target_variable: {string} name of the target variable y inside the df in file
     :return: X {pandas DataFrame} (n_samples, n_features), y {numpy array} (n_samples)
     """
-    df = pd.read_csv(filepath_or_buffer=folder_path + file_name, sep='\t', lineterminator='\n', header=0, low_memory=False)
+    if index is None:
+        df = pd.read_csv(filepath_or_buffer=folder_path + file_name, sep='\t', lineterminator='\n', header=0,
+                         low_memory=False)
+    else:
+        df = pd.read_csv(filepath_or_buffer=folder_path + file_name, sep='\t', lineterminator='\n', header=0,
+                         low_memory=False, index_col=index)
     return separate_target_variable(df=df, target_variable=target_variable)
 
 
@@ -74,12 +79,12 @@ def get_classifiers_metrics(X_train, X_test, y_train, y_test, random_state=None)
 
 if __name__ == '__main__':
     print("Starting process...")
-    data_file = 'w6_frailty_selected_56_features_chi2+f_classif+mutual_info_classif.tab'
-    # data_file = 'w6_frailty_selected_50_features_f_classif.tab'
+    # data_file = 'w6_frailty_selected_56_features_chi2+f_classif+mutual_info_classif.tab'
+    data_file = 'w6_frailty_selected_50_features_mutual_info_classif.tab'
     folder_path = 'data/best_features/'
     frailty_variable = "FFP"
     random_state = 10
-    X, y = load_data(file_name=data_file, folder_path=folder_path, target_variable=frailty_variable)
+    X, y = load_data(file_name=data_file, folder_path=folder_path, target_variable=frailty_variable, index="idauniq")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
     metrics_df = get_classifiers_metrics(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, random_state=random_state)
     metrics_df.to_csv("data/metrics/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab')
