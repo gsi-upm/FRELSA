@@ -148,7 +148,7 @@ def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", olde
     :param frailty_df_label:
     :return:
     """
-    frailty_df = frailty_df.filter(items=np.array(older_df.index), axis=0)
+    frailty_df = frailty_df.filter(items=np.array(older_df.index), axis=0).sort_index()
     frailty_df, y = separate_target_variable(df=frailty_df, target_variable=frailty_variable)
     frailty_df = frailty_df.loc[:, older_df.columns]
     older_df = replace_missing_values_w6(frailty_dataframe=older_df, replace_nan=True, replace_negatives=True)
@@ -160,6 +160,47 @@ def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", olde
     older_df.set_index("wave", append=True, inplace=True)
     final = pd.concat([older_df, frailty_df]).sort_index()
     return final, y
+
+
+def save_lstm_data(alternated_merged_df, y, target_variable="FFP",
+                   filename="w5+w6_frailty_selected_22_features_chi2+f_classif+mutual_info_classif.tab",
+                   folder_path="best_features", sep='\t', index_label='idauniq', quoting=3, escapechar='\\'):
+    """
+
+    :param alternated_merged_df:
+    :param y:
+    :param target_variable:
+    :param filename:
+    :param folder_path:
+    :param sep:
+    :param index_label:
+    :param quoting:
+    :param escapechar:
+    :return:
+    """
+    y = np.repeat(y, 2)
+    final = alternated_merged_df.copy()
+    final.reset_index(inplace=True, drop=True)
+    final[target_variable] = y
+    final.set_index(index_label, inplace=True, drop=True)
+    final.to_csv(str(folder_path) + str(filename), sep=sep, index_label=index_label, quoting=quoting,
+                 escapechar=escapechar)
+    return alternated_merged_df, y
+
+
+def load_lstm_data(filepath="data/best_features/w5+w6_frailty_selected_22_features_chi2+f_classif+mutual_info_classif.tab",
+                   index_col="idauniq", target_variable="FFP"):
+    """
+
+    :param filepath:
+    :param index_col:
+    :param target_variable:
+    :return:
+    """
+    df = pd.read_csv(filepath, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
+    y = np.array(list(df[target_variable])[1::2])
+    df.drop(target_variable, axis=1, inplace=True)
+    return df, y
 
 
 def frailty_level_w6(sex, height, weight, grip_strength, walking_time, exhaustion, activity_level):
