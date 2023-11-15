@@ -5,7 +5,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, precision_score, f1_score
-from preprocess import separate_target_variable, alternated_merge_for_lstm, load_w5
+from preprocess import separate_target_variable, alternated_merge_for_lstm, load_w5, replace_missing_values_w6, \
+    remove_constant_features, group_pre_frailty, min_max_scaling
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
@@ -55,7 +56,7 @@ def get_metrics(classifier, X_train, X_test, y_train, y_test, epochs=20):
     :param y_test: {numpy array} (n_test_samples)
     :return: accuracy {float}, precision {float} and F1 score {float} of the classifier
     """
-    classifier.fit(X_train, y_train, epochs=epochs)
+    classifier.fit(X_train, y_train)
     accuracy = accuracy_score(y_true=y_test, y_pred=classifier.predict(X_test))
     precision = precision_score(y_true=y_test, y_pred=classifier.predict(X_test))
     f1 = f1_score(y_true=y_test, y_pred=classifier.predict(X_test))
@@ -82,11 +83,11 @@ def get_classifiers_metrics(X_train, X_test, y_train, y_test, random_state=None)
     return metrics_df
 
 
-def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=50, random_state=None):
-    X, y = alternated_merge_for_lstm(older_df=older_df, frailty_df=frailty_df)
+def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=50, best_features_selection=True, k=30, random_state=None):
+    X, y = alternated_merge_for_lstm(older_df=older_df, frailty_df=frailty_df,
+                                     best_features_selection=best_features_selection, k=k)
     print(X.shape)
     X = np.array(X).reshape(X.shape[0]//2, 2, X.shape[1])
-    # X = X.reshape(5135, 2, 22)
     y -= 1
     labels = to_categorical(y, num_classes=2)
 
@@ -105,7 +106,7 @@ def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=
         else:
             y_pred[i] = [0, 1]
     metrics_df = pd.DataFrame.from_dict(classification_report(y_test, y_pred, output_dict=True), orient='index')
-    return metrics_df
+    return X, metrics_df
 
 
 if __name__ == '__main__':
@@ -118,13 +119,20 @@ if __name__ == '__main__':
     # X, y = load_data(file_name=data_file, folder_path=folder_path, target_variable=frailty_variable, index="idauniq")
     # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
     # metrics_df = get_classifiers_metrics(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, random_state=random_state)
-    # metrics_df.to_csv("data/metrics/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab',
+    # metrics_df.to_csv("data/metrics/wave_6/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab',
     #                   sep='\t', index_label='idauniq', quoting=3, escapechar='\\')
 
-    bf_w6 = pd.read_csv("data/best_features/w6_frailty_selected_83_features_chi2+f_classif+mutual_info_classif.tab",
-                        sep='\t', lineterminator='\n', index_col='idauniq', header=(0))
-    df_w5 = load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=np.array(bf_w6.columns),
-                    acceptable_idauniq=np.array(bf_w6.index))
-    lstm_metrics_df = get_lstm_metrics(frailty_df=bf_w6, older_df=df_w5)
-    lstm_metrics_df.to_csv("data/metrics/metrics_of_lstm_22_features_from_83.tab", quoting=3, escapechar='\\')
+    df_w6 = pd.read_csv("data/raw/wave_6_frailty_FFP_data.tab",
+                        sep='\t', lineterminator='\n', index_col='idauniq', header=(0), low_memory=False)
+    frailty_variable = "FFP"
+    df_w6 = replace_missing_values_w6(frailty_dataframe=df_w6, replace_nan=True, replace_negatives=True)
+    df_w6 = remove_constant_features(df_w6)
+    # Grouping frailty with pre-frailty to make the dataset balanced
+    df_w6 = group_pre_frailty(frailty_dataframe=df_w6, frailty_variable=frailty_variable)
+    df_w6 = min_max_scaling(X=df_w6)
+    df_w5 = load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=np.array(df_w6.columns),
+                    acceptable_idauniq=np.array(df_w6.index))
+    X, lstm_metrics_df = get_lstm_metrics(frailty_df=df_w6, older_df=df_w5, epochs=50, batch_size=50,
+                                          best_features_selection=True, k=40)
+    lstm_metrics_df.to_csv("data/metrics/lstm/metrics_of_lstm_" + str(X.shape[2]) + "_features.tab", quoting=3, escapechar='\\')
     print("All done!")

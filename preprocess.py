@@ -124,8 +124,8 @@ def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
     return merged
 
 
-def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=None, acceptable_idauniq=None):
-    df = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col='idauniq', low_memory=False)
+def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", index_col='idauniq', acceptable_features=None, acceptable_idauniq=None):
+    df = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
     if (acceptable_features is None) and (acceptable_idauniq is None):
         return df
     if not (acceptable_features is None):
@@ -138,7 +138,8 @@ def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_featur
     return df
 
 
-def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", older_df_label="w5", frailty_df_label="w6"):
+def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", older_df_label="w5", frailty_df_label="w6",
+                              best_features_selection=True, k=30):
     """
 
     :param older_df:
@@ -146,11 +147,16 @@ def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", olde
     :param frailty_variable:
     :param older_df_label:
     :param frailty_df_label:
+    :param best_features_selection:
+    :param k:
     :return:
     """
     frailty_df = frailty_df.filter(items=np.array(older_df.index), axis=0).sort_index()
     frailty_df, y = separate_target_variable(df=frailty_df, target_variable=frailty_variable)
     frailty_df = frailty_df.loc[:, older_df.columns]
+    if best_features_selection:
+        frailty_df = joint_feature_selection_df(X=frailty_df, y=y, k=k)
+        older_df = older_df.loc[:, np.array(frailty_df.columns)]
     older_df = replace_missing_values_w6(frailty_dataframe=older_df, replace_nan=True, replace_negatives=True)
     older_df = remove_constant_features(older_df)
     older_df = min_max_scaling(older_df)
