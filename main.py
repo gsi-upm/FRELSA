@@ -40,7 +40,7 @@ if __name__ == '__main__':
     X = df_w5.sort_index()
     y = df_w6.loc[:, frailty_variable]
     # Group frailty and pre-frailty to make dataset balanced
-    y = [min(i, 2) for i in y]
+    y = [min(i, 1) for i in y]
     print(min(y))
     print(max(y))
     print(y)
@@ -50,6 +50,6 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
     metrics_df = get_classifiers_metrics(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, random_state=random_state)
     metrics_df.to_csv("data/metrics/wave_5/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab',
-                      sep='\t', index_label='idauniq', quoting=3, escapechar='\\')
+                      sep='\t', quoting=3, escapechar='\\')
 
 

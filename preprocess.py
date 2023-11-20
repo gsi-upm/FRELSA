@@ -124,7 +124,8 @@ def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
     return merged
 
 
-def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", index_col='idauniq', acceptable_features=None, acceptable_idauniq=None):
+def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", index_col='idauniq', acceptable_features=None,
+            acceptable_idauniq=None):
     df = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
     if (acceptable_features is None) and (acceptable_idauniq is None):
         return df
@@ -194,8 +195,9 @@ def save_lstm_data(alternated_merged_df, y, target_variable="FFP",
     return alternated_merged_df, y
 
 
-def load_lstm_data(filepath="data/best_features/w5+w6_frailty_selected_22_features_chi2+f_classif+mutual_info_classif.tab",
-                   index_col="idauniq", target_variable="FFP"):
+def load_lstm_data(
+        filepath="data/best_features/w5+w6_frailty_selected_22_features_chi2+f_classif+mutual_info_classif.tab",
+        index_col="idauniq", target_variable="FFP"):
     """
 
     :param filepath:
@@ -218,9 +220,9 @@ def frailty_level_w6(sex, height, weight, grip_strength, walking_time, exhaustio
     :param weight: {float} measure in kg (weight from nurse visit)
     :param grip_strength: {float} measure with dominant hand in kg (max between mmgsd1, mmgsd2 and mmgsd3 from nurse visit)
     :param walking_time: {float} measure in m/s (min between MMWlkA and MMWlkB from core data)
-    :param activity level: {int} from 3 (max activity) to 12 (sum of HeActa HeActb and HeActc from core data)
+    :param activity_level: {int} from 3 (max activity) to 12 (sum of HeActa HeActb and HeActc from core data)
     :param exhaustion:{int}  from 2 (exhausted) to 4 (sum of PScedB and PScedH from core data)
-    :return: {int} -1 if unable to calculate; 1 if not frail; 2 if pre-frail; 3 if frail.
+    :return: {int} -1 if unable to calculate; 0 if not frail; 1 if pre-frail; 2 if frail.
     """
     met_criteria = 0
 
@@ -258,11 +260,11 @@ def frailty_level_w6(sex, height, weight, grip_strength, walking_time, exhaustio
         met_criteria += 1
 
     if met_criteria == 0:
-        return 1
+        return 0
     elif met_criteria <= 2:
-        return 2
+        return 1
     else:
-        return 3
+        return 2
 
 
 def add_fried_w6(elsa_w6_merged, drop_columns=False, drop_rows=False):
@@ -294,7 +296,7 @@ def add_fried_w6(elsa_w6_merged, drop_columns=False, drop_rows=False):
                                                       'HeActa', 'HeActb', 'HeActc'])
 
     if drop_rows:
-        elsa_w6_merged = elsa_w6_merged.loc[elsa_w6_merged['FFP'] > 0]
+        elsa_w6_merged = elsa_w6_merged.loc[elsa_w6_merged['FFP'] >= 0]
 
     return elsa_w6_merged
 
@@ -303,11 +305,11 @@ def group_pre_frailty(frailty_dataframe, frailty_variable="FFP"):
     """
     In a dataframe with the FFP (target) variable, groups frail and pre-frail subjects under the same value
 
-    :param frailty_dataframe: {pandas DataFrame} with a frailty column (1=non-frail, 2=pre-frail, 3=frail)
-    :param frailty_variable: {string} frailty variable (1=non-frail, 2=pre-frail, 3=frail), default=FFP
-    :return: {pandas DataFrame} with binary FFP column (1=non-frail, 2=pre-frail + frail) instead of multiclass
+    :param frailty_dataframe: {pandas DataFrame} with a frailty column (0=non-frail, 1=pre-frail, 2=frail)
+    :param frailty_variable: {string} frailty variable (0=non-frail, 1=pre-frail, 2=frail), default=FFP
+    :return: {pandas DataFrame} with binary FFP column (0=non-frail, 1=pre-frail or frail) instead of multiclass
     """
-    result = [min(frailty_dataframe.loc[i, frailty_variable], 2) for i in frailty_dataframe.index]
+    result = [min(frailty_dataframe.loc[i, frailty_variable], 1) for i in frailty_dataframe.index]
     frailty_dataframe[frailty_variable] = np.array(result)
     return frailty_dataframe
 
@@ -501,13 +503,13 @@ if __name__ == '__main__':
     fried = remove_constant_features(fried)
     # Grouping frailty with pre-frailty to make the dataset balanced
     fried = group_pre_frailty(frailty_dataframe=fried, frailty_variable=frailty_variable)
-    print("Non-frail: " + str(fried.loc[fried[frailty_variable] == 1].shape))
-    print("frail: " + str(fried.loc[fried[frailty_variable] == 2].shape))
+    print("Non-frail: " + str(fried.loc[fried[frailty_variable] == 0].shape))
+    print("frail: " + str(fried.loc[fried[frailty_variable] == 1].shape))
     X, y = separate_target_variable(df=fried, target_variable=frailty_variable)
     X = min_max_scaling(X=X)
     # Feature selection
-    k = 50
-    selection_functions = ["mutual_info_classif"]  # ["chi2", "f_classif", "mutual_info_classif"]
+    k = 30
+    selection_functions = ["chi2", "f_classif", "mutual_info_classif"]  # ["chi2", "f_classif", "mutual_info_classif"]
     selected_X = joint_feature_selection_df(X=X, y=y, score_functions=selection_functions, k=k)
     save_selected_df(selected_X=selected_X, y=y, frailty_column_name=frailty_variable,
                      function="_".join([str(f) for f in selection_functions]), k=selected_X.shape[1],

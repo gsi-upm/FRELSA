@@ -15,7 +15,7 @@ from keras.models import Sequential
 from keras.layers import LSTM, Dense
 from keras.utils import to_categorical
 from sklearn.metrics import classification_report
-
+import inspect
 
 # Dictionary of classifiers to be used for the baseline
 classifiers = {"SVM_linear": SVC(kernel='linear', C=0.2),
@@ -56,14 +56,18 @@ def get_metrics(classifier, X_train, X_test, y_train, y_test, epochs=20):
     :param y_test: {numpy array} (n_test_samples)
     :return: accuracy {float}, precision {float} and F1 score {float} of the classifier
     """
-    classifier.fit(X_train, y_train)
+    if 'epochs' in inspect.getfullargspec(classifier.fit).args:
+        classifier.fit(X_train, y_train, epochs=epochs)
+    else:
+        classifier.fit(X_train, y_train)
     accuracy = accuracy_score(y_true=y_test, y_pred=classifier.predict(X_test))
-    precision = precision_score(y_true=y_test, y_pred=classifier.predict(X_test))
-    f1 = f1_score(y_true=y_test, y_pred=classifier.predict(X_test))
+    precision = precision_score(y_true=y_test, y_pred=classifier.predict(X_test), average='macro')
+    f1 = f1_score(y_true=y_test, y_pred=classifier.predict(X_test), average='macro')
+
     return accuracy, precision, f1
 
 
-def get_classifiers_metrics(X_train, X_test, y_train, y_test, random_state=None):
+def get_classifiers_metrics(X_train, X_test, y_train, y_test, random_state=None, epochs=20):
     """
     Compute metrics of all the classifiers in the 'classifiers' dictionary, and returns a df with classifiers as 'index' and metrics as 'columns'.
 
@@ -78,17 +82,19 @@ def get_classifiers_metrics(X_train, X_test, y_train, y_test, random_state=None)
     for clf in classifiers:
         classifiers[clf].set_params(random_state=random_state)
         metrics[clf] = list(
-            get_metrics(classifier=classifiers[clf], X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test))
+            get_metrics(classifier=classifiers[clf], X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
+                        epochs=epochs))
+        # print(str(clf) + ":\n" + classification_report(y_test, classifiers[clf].predict(X_test)))
     metrics_df = pd.DataFrame.from_dict(data=metrics, orient='index', columns=['accuracy', 'precision', 'f1'])
     return metrics_df
 
 
-def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=50, best_features_selection=True, k=30, random_state=None):
+def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=50, best_features_selection=True, k=30,
+                     random_state=None):
     X, y = alternated_merge_for_lstm(older_df=older_df, frailty_df=frailty_df,
                                      best_features_selection=best_features_selection, k=k)
     print(X.shape)
-    X = np.array(X).reshape(X.shape[0]//2, 2, X.shape[1])
-    y -= 1
+    X = np.array(X).reshape(X.shape[0] // 2, 2, X.shape[1])
     labels = to_categorical(y, num_classes=2)
 
     model = Sequential()
@@ -111,28 +117,31 @@ def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=
 
 if __name__ == '__main__':
     print("Starting process...")
-    # data_file = 'w6_frailty_selected_56_features_chi2+f_classif+mutual_info_classif.tab'
+    data_file = 'w6_frailty_selected_85_features_chi2_f_classif_mutual_info_classif.tab'
     # data_file = 'w6_frailty_selected_50_features_mutual_info_classif.tab'
-    # folder_path = 'data/best_features/'
-    # frailty_variable = "FFP"
-    # random_state = 10
-    # X, y = load_data(file_name=data_file, folder_path=folder_path, target_variable=frailty_variable, index="idauniq")
-    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
-    # metrics_df = get_classifiers_metrics(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, random_state=random_state)
-    # metrics_df.to_csv("data/metrics/wave_6/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab',
-    #                   sep='\t', index_label='idauniq', quoting=3, escapechar='\\')
-
-    df_w6 = pd.read_csv("data/raw/wave_6_frailty_FFP_data.tab",
-                        sep='\t', lineterminator='\n', index_col='idauniq', header=(0), low_memory=False)
+    folder_path = 'data/best_features/'
     frailty_variable = "FFP"
-    df_w6 = replace_missing_values_w6(frailty_dataframe=df_w6, replace_nan=True, replace_negatives=True)
-    df_w6 = remove_constant_features(df_w6)
-    # Grouping frailty with pre-frailty to make the dataset balanced
-    df_w6 = group_pre_frailty(frailty_dataframe=df_w6, frailty_variable=frailty_variable)
-    df_w6 = min_max_scaling(X=df_w6)
-    df_w5 = load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=np.array(df_w6.columns),
-                    acceptable_idauniq=np.array(df_w6.index))
-    X, lstm_metrics_df = get_lstm_metrics(frailty_df=df_w6, older_df=df_w5, epochs=50, batch_size=50,
-                                          best_features_selection=True, k=40)
-    lstm_metrics_df.to_csv("data/metrics/lstm/metrics_of_lstm_" + str(X.shape[2]) + "_features.tab", quoting=3, escapechar='\\')
+    random_state = 20
+    epochs = 30
+    X, y = load_data(file_name=data_file, folder_path=folder_path, target_variable=frailty_variable, index="idauniq")
+    # y += 1
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
+    metrics_df = get_classifiers_metrics(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
+                                         random_state=random_state, epochs=epochs)
+    metrics_df.to_csv("data/metrics/wave_6/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab',
+    sep='\t', quoting=3, escapechar='\\')
+
+    # df_w6 = pd.read_csv("data/raw/wave_6_frailty_FFP_data.tab",
+    #                     sep='\t', lineterminator='\n', index_col='idauniq', header=(0), low_memory=False)
+    # frailty_variable = "FFP"
+    # df_w6 = replace_missing_values_w6(frailty_dataframe=df_w6, replace_nan=True, replace_negatives=True)
+    # df_w6 = remove_constant_features(df_w6)
+    # # Grouping frailty with pre-frailty to make the dataset balanced
+    # df_w6 = group_pre_frailty(frailty_dataframe=df_w6, frailty_variable=frailty_variable)
+    # df_w6 = min_max_scaling(X=df_w6)
+    # df_w5 = load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=np.array(df_w6.columns),
+    #                 acceptable_idauniq=np.array(df_w6.index))
+    # X, lstm_metrics_df = get_lstm_metrics(frailty_df=df_w6, older_df=df_w5, epochs=50, batch_size=50,
+    #                                       best_features_selection=True, k=40)
+    # lstm_metrics_df.to_csv("data/metrics/lstm/metrics_of_lstm_" + str(X.shape[2]) + "_features.tab", quoting=3, escapechar='\\')
     print("All done!")
