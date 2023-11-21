@@ -5,8 +5,9 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, precision_score, f1_score
-from preprocess import separate_target_variable, alternated_merge_for_lstm, load_w5, replace_missing_values_w6, \
-    remove_constant_features, group_pre_frailty, min_max_scaling
+from preprocess import separate_target_variable, load_w6, alternated_merge_for_lstm, load_w5, replace_missing_values_w6, \
+    remove_constant_features, group_pre_frailty, min_max_scaling, add_fried_w6, preprocess_frailty_db, \
+    joint_feature_selection_df
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
@@ -31,6 +32,7 @@ def load_data(file_name, folder_path='data/best_features/', target_variable='FFP
     """
     Loads a Dataframe and returns X and y
 
+    :param index:
     :param file_name: {string} name of the .tab file containing the dataframe with target variable
     :param folder_path: {string} path to the folder containing the file
     :param target_variable: {string} name of the target variable y inside the df in file
@@ -89,9 +91,10 @@ def get_classifiers_metrics(X_train, X_test, y_train, y_test, random_state=None,
     return metrics_df
 
 
-def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=50, best_features_selection=True, k=30,
+def get_lstm_metrics(frailty_df, y, older_df, epochs=20, batch_size=64, lstm_units=50, best_features_selection=True,
+                     k=30,
                      random_state=None):
-    X, y = alternated_merge_for_lstm(older_df=older_df, frailty_df=frailty_df,
+    X, y = alternated_merge_for_lstm(older_df=older_df, y=y, frailty_df=frailty_df,
                                      best_features_selection=best_features_selection, k=k)
     print(X.shape)
     X = np.array(X).reshape(X.shape[0] // 2, 2, X.shape[1])
@@ -117,31 +120,91 @@ def get_lstm_metrics(frailty_df, older_df, epochs=20, batch_size=64, lstm_units=
 
 if __name__ == '__main__':
     print("Starting process...")
+
+    # WAVE 6 FRAILTY DETECTION
+    # ---------------------------------------------
+    # Load data
+    # df = load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
+    #              nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab", remove_duplicates=True, index_col="idauniq")
+    # # Calculate Fried Frailty Phenotype
+    # X, y = add_fried_w6(elsa_w6_merged=df, drop_columns=True, drop_rows=True)
+    # # Preprocess the data
+    # X, y = preprocess_frailty_db(X=X, y=y, replace_missing_value=True, regex_list=None, replace_negatives=True,
+    #                              replace_nan=True, rm_constant_features=True, min_max=True, group_frailty=True)
+    # # Select the best features
+    # k = 30
+    # selection_functions = ["chi2", "f_classif", "mutual_info_classif"]  # ["chi2", "f_classif", "mutual_info_classif"]
+    # X = joint_feature_selection_df(X=X, y=y, score_functions=selection_functions, k=k)
+    # OR directly load preprocessed and best-features-selected data
     data_file = 'w6_frailty_selected_85_features_chi2_f_classif_mutual_info_classif.tab'
-    # data_file = 'w6_frailty_selected_50_features_mutual_info_classif.tab'
     folder_path = 'data/best_features/'
-    frailty_variable = "FFP"
+    X, y = load_data(file_name=data_file, folder_path=folder_path, target_variable="FFP", index="idauniq")
+    # Set Random state and number of epochs
     random_state = 20
     epochs = 30
-    X, y = load_data(file_name=data_file, folder_path=folder_path, target_variable=frailty_variable, index="idauniq")
-    # y += 1
+    # Train models
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
     metrics_df = get_classifiers_metrics(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
                                          random_state=random_state, epochs=epochs)
+    # Save results (only works if data are loaded from pre-precessed file)
     metrics_df.to_csv("data/metrics/wave_6/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab',
     sep='\t', quoting=3, escapechar='\\')
 
-    # df_w6 = pd.read_csv("data/raw/wave_6_frailty_FFP_data.tab",
-    #                     sep='\t', lineterminator='\n', index_col='idauniq', header=(0), low_memory=False)
-    # frailty_variable = "FFP"
-    # df_w6 = replace_missing_values_w6(frailty_dataframe=df_w6, replace_nan=True, replace_negatives=True)
-    # df_w6 = remove_constant_features(df_w6)
-    # # Grouping frailty with pre-frailty to make the dataset balanced
-    # df_w6 = group_pre_frailty(frailty_dataframe=df_w6, frailty_variable=frailty_variable)
-    # df_w6 = min_max_scaling(X=df_w6)
-    # df_w5 = load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=np.array(df_w6.columns),
-    #                 acceptable_idauniq=np.array(df_w6.index))
-    # X, lstm_metrics_df = get_lstm_metrics(frailty_df=df_w6, older_df=df_w5, epochs=50, batch_size=50,
-    #                                       best_features_selection=True, k=40)
-    # lstm_metrics_df.to_csv("data/metrics/lstm/metrics_of_lstm_" + str(X.shape[2]) + "_features.tab", quoting=3, escapechar='\\')
+    # WAVE 5 FRAILTY PREDICTION
+    # ---------------------------------------------
+    # Load wave 6 data
+    df_w6, y = load_data(file_name="wave_6_frailty_FFP_data.tab", folder_path="data/raw/", target_variable="FFP",
+                         index="idauniq")
+
+    # Load wave 5 data
+    data_file = "wave_5_elsa_data_v4.tab"
+    X = load_w5(core_data_path="data/raw/" + str(data_file), index_col='idauniq', acceptable_features=None,
+                acceptable_idauniq=df_w6.index)
+    # Filter frailty variable and sort the data
+    y = y.loc[X.index]
+    y.sort_index(inplace=True)
+    X.sort_index(inplace=True)
+    # Preprocess the data
+    X, y = preprocess_frailty_db(X=X, y=y, replace_missing_value=True, regex_list=None, replace_negatives=True,
+                                 replace_nan=True, rm_constant_features=True, min_max=True, group_frailty=True)
+    # Select the best features
+    k = 30
+    selection_functions = ["chi2", "f_classif", "mutual_info_classif"]  # ["chi2", "f_classif", "mutual_info_classif"]
+    X = joint_feature_selection_df(X=X, y=y, score_functions=selection_functions, k=k)
+    # Set Random state and number of epochs
+    random_state = 20
+    epochs = 30
+    # Train models
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=random_state)
+    metrics_df = get_classifiers_metrics(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test,
+                                         random_state=random_state, epochs=epochs)
+    # Save results
+    metrics_df.to_csv(
+        "data/metrics/wave_5/metrics_of_" + data_file.split('.', 1)[0] + '_random_state_' + str(random_state) + '.tab',
+        sep='\t', quoting=3, escapechar='\\')
+
+    # WAVE 5 AND 6 LSTM FRAILTY DETECTION
+    # ---------------------------------------------
+    # Load wave 6 data
+    df = load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
+                 nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab", remove_duplicates=True, index_col="idauniq")
+    # Calculate Fried Frailty Phenotype
+    X, y = add_fried_w6(elsa_w6_merged=df, drop_columns=True, drop_rows=True)
+    # Preprocess the data
+    X, y = preprocess_frailty_db(X=X, y=y, replace_missing_value=True, regex_list=None, replace_negatives=True,
+                                 replace_nan=True, rm_constant_features=True, min_max=True, group_frailty=True)
+    # Load wave 5 data
+    df_w5 = load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", acceptable_features=np.array(X.columns),
+                    acceptable_idauniq=np.array(X.index))
+    # Set bet features, random state and number of epochs
+    k = 40
+    random_state = 20
+    epochs = 30
+    batch_size = 50
+    # Train LSTM
+    X, lstm_metrics_df = get_lstm_metrics(frailty_df=X, y=y, older_df=df_w5, epochs=epochs, batch_size=batch_size,
+                                          best_features_selection=True, k=k)
+    # Save results
+    lstm_metrics_df.to_csv("data/metrics/lstm/metrics_of_lstm_" + str(X.shape[2]) + "_features.tab", quoting=3,
+                           escapechar='\\')
     print("All done!")

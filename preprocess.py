@@ -139,7 +139,7 @@ def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", index_col='idauni
     return df
 
 
-def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", older_df_label="w5", frailty_df_label="w6",
+def alternated_merge_for_lstm(older_df, frailty_df, y, older_df_label="w5", frailty_df_label="w6",
                               best_features_selection=True, k=30):
     """
 
@@ -153,7 +153,8 @@ def alternated_merge_for_lstm(older_df, frailty_df, frailty_variable="FFP", olde
     :return:
     """
     frailty_df = frailty_df.filter(items=np.array(older_df.index), axis=0).sort_index()
-    frailty_df, y = separate_target_variable(df=frailty_df, target_variable=frailty_variable)
+    y = y.filter(items=np.array(older_df.index), axis=0).sort_index()
+    # frailty_df, y = separate_target_variable(df=frailty_df, target_variable=frailty_variable)
     frailty_df = frailty_df.loc[:, older_df.columns]
     if best_features_selection:
         frailty_df = joint_feature_selection_df(X=frailty_df, y=y, k=k)
@@ -298,10 +299,25 @@ def add_fried_w6(elsa_w6_merged, drop_columns=False, drop_rows=False):
     if drop_rows:
         elsa_w6_merged = elsa_w6_merged.loc[elsa_w6_merged['FFP'] >= 0]
 
-    return elsa_w6_merged
+    y = elsa_w6_merged.loc[:, 'FFP']
+    elsa_w6_merged.drop('FFP', axis=1, inplace=True)
+    return elsa_w6_merged, y
 
 
-def group_pre_frailty(frailty_dataframe, frailty_variable="FFP"):
+def load_w6_merged(file_path="data/raw/wave_6_frailty_FFP_data.tab", frailty_variable="FFP", index_col="idauniq"):
+    """
+
+    :param file_path:
+    :param frailty_variable:
+    :param index_col:
+    :return:
+    """
+    df = pd.read_csv(file_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
+    y = df.drop(frailty_variable, inplace=True)
+    return df, y
+
+
+def group_pre_frailty(y):
     """
     In a dataframe with the FFP (target) variable, groups frail and pre-frail subjects under the same value
 
@@ -309,9 +325,13 @@ def group_pre_frailty(frailty_dataframe, frailty_variable="FFP"):
     :param frailty_variable: {string} frailty variable (0=non-frail, 1=pre-frail, 2=frail), default=FFP
     :return: {pandas DataFrame} with binary FFP column (0=non-frail, 1=pre-frail or frail) instead of multiclass
     """
-    result = [min(frailty_dataframe.loc[i, frailty_variable], 1) for i in frailty_dataframe.index]
-    frailty_dataframe[frailty_variable] = np.array(result)
-    return frailty_dataframe
+    # result = [min(frailty_dataframe.loc[i, frailty_variable], 1) for i in frailty_dataframe.index]
+    # frailty_dataframe[frailty_variable] = np.array(result)
+    # return frailty_dataframe
+
+    # y = np.array([min(i, 1) for i in y])
+    y = y.apply(lambda x: min(x, 1))
+    return y
 
 
 def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negatives=True, replace_nan=True):
@@ -364,6 +384,33 @@ def min_max_scaling(X):
     X_scaled = (X - X.min()) / (X.max() - X.min())
     X_scaled.fillna(0, inplace=True)
     return X_scaled
+
+
+def preprocess_frailty_db(X, y, replace_missing_value=True, regex_list=None, replace_negatives=True, replace_nan=True,
+                          rm_constant_features=True, min_max=True, group_frailty=True):
+    """
+
+    :param X:
+    :param y:
+    :param replace_missing_value:
+    :param regex_list:
+    :param replace_negatives:
+    :param replace_nan:
+    :param rm_constant_features:
+    :param min_max:
+    :param group_frailty:
+    :return:
+    """
+    if replace_missing_value:
+        X = replace_missing_values_w6(frailty_dataframe=X, regex_list=regex_list, replace_negatives=replace_negatives,
+                                      replace_nan=replace_nan)
+    if rm_constant_features:
+        X = remove_constant_features(X)
+    if min_max:
+        X = min_max_scaling(X=X)
+    if group_frailty:
+        y = group_pre_frailty(y=y)
+    return X, y
 
 
 def separate_target_variable(df, target_variable="FFP"):
