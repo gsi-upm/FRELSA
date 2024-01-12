@@ -11,7 +11,7 @@ function_dict = {
     "mutual_info_classif": mutual_info_classif,
 }
 
-variables_dict = {
+variables_dict_w6 = {
 
     'hemobwa': "Mobility: difficulty walking 100 yards",
     'hemobch': "Mobility: difficulty getting up from chair after sitting long periods",
@@ -125,8 +125,10 @@ def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
 
 
 def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", index_col='idauniq', acceptable_features=None,
-            acceptable_idauniq=None):
+            acceptable_idauniq=None, drop_frailty_columns=True):
     df = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
+    if drop_frailty_columns:
+        df = df.drop(labels=['mmwlka', 'mmwlkb', 'fstgs_tm', 'gtspd_mn', 'diagr', 'indobyr'], axis=1)
     if (acceptable_features is None) and (acceptable_idauniq is None):
         return df
     if not (acceptable_features is None):
@@ -154,19 +156,24 @@ def alternated_merge_for_lstm(older_df, frailty_df, y, older_df_label="w5", frai
     """
     frailty_df = frailty_df.filter(items=np.array(older_df.index), axis=0).sort_index()
     y = y.filter(items=np.array(older_df.index), axis=0).sort_index()
+    print("wave 6: " + str(frailty_df.shape))
+    print("y: " + str(y.shape))
     # frailty_df, y = separate_target_variable(df=frailty_df, target_variable=frailty_variable)
     frailty_df = frailty_df.loc[:, older_df.columns]
+    print("wave 6: " + str(frailty_df.shape))
     if best_features_selection:
         frailty_df = joint_feature_selection_df(X=frailty_df, y=y, k=k)
         older_df = older_df.loc[:, np.array(frailty_df.columns)]
     older_df = replace_missing_values_w6(frailty_dataframe=older_df, replace_nan=True, replace_negatives=True)
     older_df = remove_constant_features(older_df)
     older_df = min_max_scaling(older_df)
+    print("wave 5: " + str(older_df.shape))
     frailty_df["wave"] = np.array([frailty_df_label for i in range(frailty_df.shape[0])])
     frailty_df.set_index("wave", append=True, inplace=True)
     older_df["wave"] = np.array([older_df_label for i in range(older_df.shape[0])])
     older_df.set_index("wave", append=True, inplace=True)
     final = pd.concat([older_df, frailty_df]).sort_index()
+    print("final: " + str(final.shape))
     return final, y
 
 
@@ -493,7 +500,7 @@ def iterate_mutual_info_selection(x, y, score_func=mutual_info_classif,
     return best_features_dataframe
 
 
-def joint_feature_selection_df(X, y, score_functions=[chi2, f_classif, mutual_info_classif], k=100):
+def joint_feature_selection_df(X, y, score_functions=[chi2, f_classif, mutual_info_classif], k=100, print_selected=False):
     """
     Performs feature selection with different score function and then joins the obtained dataframes.
 
@@ -509,6 +516,8 @@ def joint_feature_selection_df(X, y, score_functions=[chi2, f_classif, mutual_in
     for function in score_functions:
         selected_variables += feature_selection_list(X=X, y=y, score_func=function, k=k)
     selected_variables = list(set(selected_variables))
+    if print_selected:
+        print(X.iloc[:, selected_variables].columns)
     return X.iloc[:, selected_variables]
 
 
