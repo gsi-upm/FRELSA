@@ -1,0 +1,10 @@
+*.log
+*.csv
+*.tab
+*.txt
+*.mat
+*.ipynb
+*.sav
+__pycache__
+.*
+data

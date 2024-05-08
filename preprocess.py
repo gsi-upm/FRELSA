@@ -1,122 +1,25 @@
 import numpy as np
 import pandas as pd
-from CFSmethod import CFS
-from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_classif, RFE
+from skrebate import multisurf
+
+from models import load_data
 
 pd.options.mode.chained_assignment = None
 
-function_dict = {
-    "chi2": chi2,
-    "f_classif": f_classif,
-    "mutual_info_classif": mutual_info_classif,
-}
-
-variables_dict_w6 = {
-
-    'hemobwa': "Mobility: difficulty walking 100 yards",
-    'hemobch': "Mobility: difficulty getting up from chair after sitting long periods",
-    'hemobcs': "Mobility: difficulty climbing several flights stairs without resting",
-    'hemobcl': "Mobility: difficulty climbing one flight stairs without resting",
-    'hemobst': "Mobility: difficulty stooping, kneeling or crouching",
-    'hemobpu': "Mobility: difficulty pulling or pushing large objects",
-    'hemobli': "Mobility: difficulty lifting or carrying weights over 10 pounds",
-    'hemob96': "Mobility: whether said had none of listed difficulties",
-    'headldr': "ADL: difficulty dressing, including putting on shoes and socks",
-    'SPCar': "Whether respondent has use of car or van when needed, as a driver or a passenger",
-    'headlba': "ADL: difficulty bathing or showering",
-    'SPCarB': "Whether respondent drove a car or van themself in the past?",
-    'headlsh': "IADL: difficulty shopping for groceries",
-    'SPTraB6': "Reason respondent does not use public transport: their health prevents them",
-    'SPTraB12': "Reason respondent does not use public transport: difficulties with mobility",
-    'headlho': "[Difficulty] Doing work around the house or garden",
-    'heaidca': "Aids used: cane or walking stick",
-    'headl96': "ADL&IADL: whether said had none of listed difficulties",
-    'PSAgF': "Self-perceived age",
-    'NumMeds': "DRUG: NumMeds",
-    'SPTraM6': "Merged var - reason resp does not use public transport: health prevents them",
-    'heaid96': "Aids used: not use any of listed aids (walking or special eating or personal alarm)",
-    'hecach': "Aids: whether cane acquired since last interview",
-    'SPTraM12': "Merged var - reason respondent does not use public transport: mobility problems",
-    'hecacov': "Aids, cane or walking stick: whether covered all costs",
-    'scinp1': "Places respondent has used the internet or email in last 3 months: At home",
-    'scina02': "Activities respondent used internet for in last 3 months: Finding information about goods and services",
-    'scina05': "Activities respondent used internet for in last 3 months: Shopping/buying goods or services",
-    'mmlsre': "LEGRAISE: Leg raise (eyes shut): Outcome",
-    'mmlssc': "LEGRAISE: Leg raise (eyes shut): Respondent feels safe to attempt it",
-    'mmlore': "LEGRAISE: Leg raise (eyes open): Outcome",
-    'CaTkA': "Received help in last month: walking 100 yards",
-    'CaTkB': "Received help in last month: climbing several flights of stairs without resting",
-    'CaTkC': "Received help in last month: climbing one flight of stairs without resting",
-    'CaTkD': "Received help in last month: dressing, including putting on shoes and socks",
-    'CaTkE': "Received help in last month: walking across a room",
-    'CaTkF': "Received help in last month: bathing or showering",
-    'CaTkG': "Received help in last month: eating, such as cutting up food",
-    'CaTkH': "Received help in last month: getting in and out of bed",
-    'CaTkI': "Received help in last month: using the toilet, including getting up or down",
-    'CaTkJ': "Received help in last month: shopping for groceries",
-    'CaTkK': "Received help in last month: taking medications",
-    'CaTkL': "Received help in last month: doing work around the house or garden",
-    'CaTkM': "Received help in last month: managing money, such as paying bills and keeping track of expenses",
-    'CaTNo': "COMPUTED: Number of activities respondent has received help with in the last month",
-    'CaWIn': "COMPUTED: Received eligible help and asked questions about it",
-    'mmrrre': "CHAIRRAISE: Outcome of multiple chair rises (number of rises completed)",
-    'scqola': "CASP19 scale: How often feels age prevents them from doing things they like",
-    'scqolh': "CASP19 scale: How often feels their health stops them doing what they want to do",
-    'scqolo': "CASP19 scale: How often feels full of energy these days",
-    'htfvc': "LUNG: Highest technically satisfactory value for FVC",
-    'htfev': "LUNG: Highest technically satisfactory value for FEV",
-    'Hehelf': "Self-reported general health",
-    'HeLWk': "Whether has self-reported health problem/disability that limits paid work",
-    'Hetemp': "Whether expects health problem/disability to last less than 3 months",
-    'HeFunc': "Difficulty walking 1/4 mile unaided",
-    'MMRROC': "(D) Chair rise: Outcome of multiple chair rises, split by age",
-    'MMFTRE2': "(D) Outcome of full tandem stand according to age",
-    'Indobyr': "Definitive year of birth collapsed at 90 plus",
-    'indager': "Definitive age variable collapsed at 90+ to avoid disclosure",
-    'CaHFoNo1': "Formal help received - with moving (catka, b, c, e, h, i): None of these",
-    'CahFMNo1': "Formal help received - with moving (catka, b, c, e, h, i): None of these (merged var)",
-    'CaHInHW4': "Informal help received - with shopping & work around the house (catkaj, L): Husb/Wife/Partner",
-    'CaHFoNo4': "Formal help received - with shopping & work around the house (catkaj, L): None of these",
-    'CahFMNo4': "Formal help received - with shopping & work around the house (catkaj, L): None of these (merged var)",
-    'CaHpC': "How often all help received meets needs",
-    'Indobyr_x': "Definitive year of birth collapsed at 90 plus",
-    'CaFnd1': "Type of provider for questions about care patterns (provider 1)",
-    'CaHpF': "How often does provider 1 care patterns (CaFnd1) help?",
-    'CaHpW': "Does provider 1 care patterns (CaFnd1) help during day or night?",
-    'CaDP3': "How LA is involved in paying for care: no direct payment or LA management of money",
-    'CaPB': "Whether has a personal budget from LA",
-    'CaInA': "Whether had an income assessment by LA",
-    'MedBIA3': "DRUG: Have they taken/used MedBI in the last 7 days?",
-    'MedBIA4': "DRUG: Have they taken/used MedBI in the last 7 days?",
-    'MedBIA5': "DRUG: Have they taken/used MedBI in the last 7 days?",
-    'MedBIA7': "DRUG: Have they taken/used MedBI in the last 7 days?",
-    'CaRA': "Care arranged by local authority (council care package): ask route A payments (CaPay etc)",
-    'mmrrfti': "CHAIRRAISE: Time to complete 5 rises (seconds)",
-    'mmrrtti': "CHAIRRAISE: Time to complete 10 rises (seconds) - only eligible if under 70 yrs",
-    'CaPAdNo2': "Does anyone else pay for the care: nobody else pays (provider at CaAsk1)",
-    'HePaa': "Severity of pain most of the time",
-    'HePag': "Pain: how long been bothering you (if moderate or severe)",
-    'PRFEV': "LUNG: Predicted value for FEV",
-    'PRPEF': "LUNG: Predicted value for PEF",
-    'Helim': "Whether long-standing illness is limiting",
-    'DrC4': "DRUG: Drug Code [of MedBIA4]",
-
-    'FFP': "Fried's Frailty Phenotype",
-}
-
 
 def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
-            nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab", remove_duplicates=True, index_col="idauniq"):
+            nurse_data_path="data/raw/wave_6_elsa_nurse_data_v2.tab", index_col="idauniq", remove_duplicates=True):
     """
-    Loads core data and nurse visit data from wave 6 and merges them into a single pandas dataframe.
-    :param index_col:
-    :param remove_duplicates: {Boolean} if True, remove duplicate columns from the two dataframes
+    Loads wave 6 core data and nurse visit data from .tab files, and merges them into a single pandas DataFrame.
+
     :param core_data_path: {string} path to Elsa wave 6 core raw data
     :param nurse_data_path: {string} path to Elsa wave 6 nurse visit raw data
-    :return: merged {pandas DataFrame}, merged dataframe on the identification column 'idauniq'
+    :param index_col: {string} name of the index column that both entry dataframes should have. Default='idauniq'
+    :param remove_duplicates: {Boolean} if True, remove duplicate columns from the two dataframes. If False, the duplicate columns from the second df will have the suffix '_y'. Default=True
+    :return: merged {DataFrame} (n_samples, n_features), merged dataframe on the index column
     """
-
-    nurse = pd.read_csv(nurse_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col)
+    nurse = pd.read_csv(nurse_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col,
+                        low_memory=False)
     main = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
     merged = main.merge(right=nurse, on=index_col, suffixes=('', '_y'))
     if remove_duplicates:
@@ -125,10 +28,20 @@ def load_w6(core_data_path="data/raw/wave_6_elsa_data_v2.tab",
 
 
 def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", index_col='idauniq', acceptable_features=None,
-            acceptable_idauniq=None, drop_frailty_columns=True):
+            acceptable_idauniq=None, drop_frailty_columns=None):
+    """
+    Loads wave 5 data from a .tab file and returns them in a pandas DataFrame.
+
+    :param core_data_path: {string} path to Elsa wave 5 core raw data
+    :param index_col: {string} name of the index column that should coincide with the index of wave 6. Default='idauniq'
+    :param acceptable_features: {array} list of acceptable features to load. Alternative to drop_frailty_columns. Default=None
+    :param acceptable_idauniq: {array} list of acceptable indexes, useful to only load patients who were still present in wave 6 and got the frailty level compudet. Default=None
+    :param drop_frailty_columns: {array} list of variable to drop from the DataFrame. Default=None
+    :return: df {DataFrame} (n_samples, n_features), wave 5 dataframe
+    """
     df = pd.read_csv(core_data_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
-    if drop_frailty_columns:
-        df = df.drop(labels=['mmwlka', 'mmwlkb', 'fstgs_tm', 'gtspd_mn', 'diagr', 'indobyr'], axis=1)
+    if drop_frailty_columns is not None:
+        df = df.drop(labels=drop_frailty_columns, axis=1)
     if (acceptable_features is None) and (acceptable_idauniq is None):
         return df
     if not (acceptable_features is None):
@@ -136,92 +49,13 @@ def load_w5(core_data_path="data/raw/wave_5_elsa_data_v4.tab", index_col='idauni
         df = df.loc[:, acceptable_features]
         if acceptable_idauniq is None:
             return df
-    # acceptable_idauniq = np.array(set(df['idauniq']) & set(acceptable_idauniq))
     df = df.filter(items=acceptable_idauniq, axis=0)
     return df
 
 
-def alternated_merge_for_lstm(older_df, frailty_df, y, older_df_label="w5", frailty_df_label="w6",
-                              best_features_selection=True, k=30):
-    """
-
-    :param older_df:
-    :param frailty_df:
-    :param frailty_variable:
-    :param older_df_label:
-    :param frailty_df_label:
-    :param best_features_selection:
-    :param k:
-    :return:
-    """
-    frailty_df = frailty_df.filter(items=np.array(older_df.index), axis=0).sort_index()
-    y = y.filter(items=np.array(older_df.index), axis=0).sort_index()
-    print("wave 6: " + str(frailty_df.shape))
-    print("y: " + str(y.shape))
-    # frailty_df, y = separate_target_variable(df=frailty_df, target_variable=frailty_variable)
-    frailty_df = frailty_df.loc[:, older_df.columns]
-    print("wave 6: " + str(frailty_df.shape))
-    if best_features_selection:
-        frailty_df = joint_feature_selection_df(X=frailty_df, y=y, k=k)
-        older_df = older_df.loc[:, np.array(frailty_df.columns)]
-    older_df = replace_missing_values_w6(frailty_dataframe=older_df, replace_nan=True, replace_negatives=True)
-    older_df = remove_constant_features(older_df)
-    older_df = min_max_scaling(older_df)
-    print("wave 5: " + str(older_df.shape))
-    frailty_df["wave"] = np.array([frailty_df_label for i in range(frailty_df.shape[0])])
-    frailty_df.set_index("wave", append=True, inplace=True)
-    older_df["wave"] = np.array([older_df_label for i in range(older_df.shape[0])])
-    older_df.set_index("wave", append=True, inplace=True)
-    final = pd.concat([older_df, frailty_df]).sort_index()
-    print("final: " + str(final.shape))
-    return final, y
-
-
-def save_lstm_data(alternated_merged_df, y, target_variable="FFP",
-                   filename="w5+w6_frailty_selected_22_features_chi2+f_classif+mutual_info_classif.tab",
-                   folder_path="best_features", sep='\t', index_label='idauniq', quoting=3, escapechar='\\'):
-    """
-
-    :param alternated_merged_df:
-    :param y:
-    :param target_variable:
-    :param filename:
-    :param folder_path:
-    :param sep:
-    :param index_label:
-    :param quoting:
-    :param escapechar:
-    :return:
-    """
-    y = np.repeat(y, 2)
-    final = alternated_merged_df.copy()
-    final.reset_index(inplace=True, drop=True)
-    final[target_variable] = y
-    final.set_index(index_label, inplace=True, drop=True)
-    final.to_csv(str(folder_path) + str(filename), sep=sep, index_label=index_label, quoting=quoting,
-                 escapechar=escapechar)
-    return alternated_merged_df, y
-
-
-def load_lstm_data(
-        filepath="data/best_features/w5+w6_frailty_selected_22_features_chi2+f_classif+mutual_info_classif.tab",
-        index_col="idauniq", target_variable="FFP"):
-    """
-
-    :param filepath:
-    :param index_col:
-    :param target_variable:
-    :return:
-    """
-    df = pd.read_csv(filepath, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
-    y = np.array(list(df[target_variable])[1::2])
-    df.drop(target_variable, axis=1, inplace=True)
-    return df, y
-
-
 def frailty_level_w6(sex, height, weight, grip_strength, walking_time, exhaustion, activity_level):
     """
-    Calculates Fried's Frailty Phenotype (FFP) starting from wave 6 ELSA merged database.
+    Calculates Fried's Frailty Phenotype (FFP) starting from wave 6 ELSA database, obtained by merging core data and nurse visit data.
 
     :param sex: {int} 1 = Male, 2 = Female (indsex from core data)
     :param height: {float} measure in cm (height from core data)
@@ -279,10 +113,10 @@ def add_fried_w6(elsa_w6_merged, drop_columns=False, drop_rows=False):
     """
     Adds Fried's Frailty Phenotype ('FFP') column to wave 6 ELSA merged database.
 
-    :param elsa_w6_merged: {pandas DataFrame} ELSA wave 6 with core data and nurse visit merged
+    :param elsa_w6_merged: {pandas DataFrame} (n_samples, n_features) ELSA wave 6 with core data and nurse visit merged
     :param drop_columns: {Bool} if True deletes the columns used for FFP computation, default=False
     :param drop_rows: {Bool} if True deletes the rows for which FFP could not be calculated, default=False
-    :return: elsa_w6_merged {pandas DataFrame} original dataframe with FFP column added
+    :return: elsa_w6_merged {pandas DataFrame} (n_samples, n_features + 1) original dataframe with FFP column added
     """
 
     elsa_w6_merged['FFP'] = elsa_w6_merged.apply(lambda row: frailty_level_w6(sex=row.indsex,
@@ -311,61 +145,41 @@ def add_fried_w6(elsa_w6_merged, drop_columns=False, drop_rows=False):
     return elsa_w6_merged, y
 
 
-def load_w6_merged(file_path="data/raw/wave_6_frailty_FFP_data.tab", frailty_variable="FFP", index_col="idauniq"):
-    """
-
-    :param file_path:
-    :param frailty_variable:
-    :param index_col:
-    :return:
-    """
-    df = pd.read_csv(file_path, sep='\t', lineterminator='\n', header=(0), index_col=index_col, low_memory=False)
-    y = df.drop(frailty_variable, inplace=True)
-    return df, y
-
-
 def group_pre_frailty(y):
     """
-    In a dataframe with the FFP (target) variable, groups frail and pre-frail subjects under the same value
+    Given an array of FFP (target) variable, groups frail and pre-frail subjects under the same value. Assumes there are no negative values.
 
-    :param frailty_dataframe: {pandas DataFrame} with a frailty column (0=non-frail, 1=pre-frail, 2=frail)
-    :param frailty_variable: {string} frailty variable (0=non-frail, 1=pre-frail, 2=frail), default=FFP
-    :return: {pandas DataFrame} with binary FFP column (0=non-frail, 1=pre-frail or frail) instead of multiclass
+    :param y: {array} (n_samples) frailty variable (0=non-frail, 1=pre-frail, 2=frail)
+    :return: {array} (n_samples) with binary target variable (0=non-frail, 1=pre-frail or frail) instead of multiclass
     """
-    # result = [min(frailty_dataframe.loc[i, frailty_variable], 1) for i in frailty_dataframe.index]
-    # frailty_dataframe[frailty_variable] = np.array(result)
-    # return frailty_dataframe
 
-    # y = np.array([min(i, 1) for i in y])
     y = y.apply(lambda x: min(x, 1))
     return y
 
 
-def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negatives=True, replace_nan=True):
+def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negatives=None, replace_nan=None):
     """
     Replaces nan entries, str entries and negative floats with 0
 
-    :param frailty_dataframe: {pandas DataFrame} with frailty column FFP
-    :param regex_list: {list of strings} list of regular expressions to replace, default tailored to merged w6 ELSA
-    :param replace_negatives: {Boolean}, whether to replace negative values with 0 or not, default=True
-    :param replace_nan: {Boolean} whether to replace NaN and None values with 0 or not, default=True
-    :return: {pandas DataFrame} with zeroes instead of strings and negatives
+    :param frailty_dataframe: {pandas DataFrame} (n_samples, n_features) X
+    :param regex_list: {list of str} list of regular expressions to be replaced by nan, only matters if replace_missing_values=True, default=None
+    :param replace_negatives: {float, int, nan} value with which to replace negatives values of X, default=None
+    :param replace_nan: {float, int} value with which to replace nan values of X, default=None
+    :return: {pandas DataFrame} (n_samples, n_features) with replaced values
     """
 
     if regex_list is None:
         regex_list = ["\s",
                       ".*:.*:.*", ".*-.*-.*",
-                      # "A.*", "B.*", "C.*", "D.*", "E.*", "N.*", "P.*", "R.*", "S.*", "T.*", "V.*",
                       "[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz]",
                       ]
-    frailty_dataframe.replace(to_replace=regex_list, value=0, inplace=True, regex=True)
+    frailty_dataframe.replace(to_replace=regex_list, value=np.nan, inplace=True, regex=True)
     frailty_dataframe = frailty_dataframe.astype(float)
-    if replace_negatives:
+    if replace_negatives is not None:
         frailty_dataframe.replace(to_replace=[i for i in range(-1, -10, -1)] + [str(i) for i in range(-1, -10, -1)],
-                                  value=0, inplace=True)
-    if replace_nan:
-        frailty_dataframe.fillna(0, inplace=True)
-        frailty_dataframe.replace(to_replace=np.nan, value=0, inplace=True)
+                                  value=replace_negatives, inplace=True)
+    if replace_nan is not None:
+        frailty_dataframe.replace(to_replace=np.nan, value=replace_nan, inplace=True)
     return frailty_dataframe
 
 
@@ -373,8 +187,8 @@ def remove_constant_features(X):
     """
     Removes constant features from the dataframe
 
-    :param X: {pandas DataFrame}
-    :return: {pandas DataFrame}
+    :param X: {pandas DataFrame} (n_samples, n_features)
+    :return: {pandas DataFrame} (n_samples, n_features_not_removed)
     """
 
     return X.loc[:, X.apply(pd.Series.nunique) != 1]
@@ -384,8 +198,8 @@ def min_max_scaling(X):
     """
     Scales values of the dataframe between 0 and 1 with min-max logic, except for the target frailty variable
 
-    :param X: {pandas DataFrame} df to scale
-    :return: {pandas DataFrame} scaled following min-max logic
+    :param X: {pandas DataFrame} (n_samples, n_features) df to scale
+    :return: {pandas DataFrame} (n_samples, n_features) scaled following min-max logic
     """
 
     X_scaled = (X - X.min()) / (X.max() - X.min())
@@ -393,20 +207,20 @@ def min_max_scaling(X):
     return X_scaled
 
 
-def preprocess_frailty_db(X, y, replace_missing_value=True, regex_list=None, replace_negatives=True, replace_nan=True,
-                          rm_constant_features=True, min_max=True, group_frailty=True):
+def preprocess_frailty_db(X, y, replace_missing_value=True, regex_list=None, replace_negatives=None, replace_nan=None,
+                          rm_constant_features=False, min_max=True, group_frailty=True):
     """
 
-    :param X:
-    :param y:
-    :param replace_missing_value:
-    :param regex_list:
-    :param replace_negatives:
-    :param replace_nan:
-    :param rm_constant_features:
-    :param min_max:
-    :param group_frailty:
-    :return:
+    :param X: {pandas DataFrame} (n_samples, n_features) df to preprocess
+    :param y: {np array} (n_samples) target labels
+    :param replace_missing_value: {Bool} if True replaces missing values of X, default=True
+    :param regex_list: {list of str} list of regular expressions to be replaced by nan, only matters if replace_missing_values=True, default=None
+    :param replace_negatives: {float, int, nan} value with which to replace negatives values of X, default=None
+    :param replace_nan: {float, int} value with which to replace nan values of X, default=None
+    :param rm_constant_features: {Bool} if True removes constant features from X, default=False
+    :param min_max: {Bool} if True scales X using min-max logic, default=True
+    :param group_frailty: {Bool} if True groups 1 and 2 values of y, default=True
+    :return: {pandas DataFrame} (n_samples, n_features), {np array} (n_samples): processed df, target labels
     """
     if replace_missing_value:
         X = replace_missing_values_w6(frailty_dataframe=X, regex_list=regex_list, replace_negatives=replace_negatives,
@@ -424,9 +238,9 @@ def separate_target_variable(df, target_variable="FFP"):
     """
     Separates target variable column from the rest of the df.
 
-    :param df: {pandas DataFrame} df containing target variable
-    :param target_variable: {string} name of the target variable column within df
-    :return: X, y
+    :param df: {pandas DataFrame} (n_samples, n_features + 1) df containing target variable
+    :param target_variable: {string} name of the target variable column within df, default='FFP'
+    :return: {pandas DataFrame} (n_samples, n_features), {np array} (n_samples): X, y
     """
 
     variables = list(df.columns.values)
@@ -436,141 +250,49 @@ def separate_target_variable(df, target_variable="FFP"):
     return X, y
 
 
-def feature_selection_list(X, y, score_func=chi2, k=100):
+def multisurf_feature_selection(X, y, n_features=50, discrete_threshold=20, n_jobs=1, save_features=False, file_path=None):
     """
-    Selects k best features from the frailty dataframe using a statistical score function
 
     :param X: {pandas DataFrame} (n_samples, n_features)
-    :param y: {numpy array} (n_samples) frailty target variable
-    :param score_func: {string or function} statistical function to use to rate the k-best variables, default=chi2
-    :param k: {int} number of variables to select, default=100
-    :return: {list} with the names of the k-best variables
+    :param y: {np array} (n_samples) target labels
+    :param n_features: {int} number of features to select, default=50
+    :param discrete_threshold: {int} max number of values to consider a feature categorical, default=20
+    :param n_jobs: {int} number of parallel jobs, default=1
+    :param save_features: {Bool} if True, saves list of selected features in 'file_path', default=False
+    :param file_path: {str} path to save the features list, only works if save_features=True, default=None
+    :return: {pandas DataFrame} (n_samples, n_features_selected), {np array} (n_samples): selected_X, y
     """
-
-    if type(score_func) == str:
-        score_func = function_dict[score_func]
-    select = SelectKBest(score_func=score_func, k=k)
-    select.fit_transform(X, y)
-    cols_idxs = np.array(select.get_support(indices=True))
-    return cols_idxs.tolist()
-
-
-def feature_selection_df(X, y, score_func=chi2, k=100):
-    """
-    Selects k variables from dataset X based on a score_func. Uses feature_selection_list() logic.
-
-    :param X: {pandas DataFrame} (n_samples, n_features)
-    :param y: {numpy array} (n_samples) frailty target variable
-    :param score_func: {string or function} statistical function to use to rate the k-best variables, default=chi2
-    :param k: {int} number of variables to select, default=100
-    :return: {pandas DataFrame} (n_samples, k) filtered dataframe containing only k best variables
-    """
-
-    if type(score_func) == str:
-        score_func = function_dict[score_func]
-    selected_columns = feature_selection_list(X=X, y=y, score_func=score_func, k=k)
-    return X.iloc[:, selected_columns]
-
-
-def iterate_mutual_info_selection(x, y, score_func=mutual_info_classif,
-                                  initial_k=100, iterations=10, final_k=50):
-    """
-    Iterates mutual_info_classif feature selection to keep the most consistent selections throughout the iterations
-
-    :param x:
-    :param y:
-    :param score_func:
-    :param initial_k:
-    :param iterations:
-    :param final_k:
-    :return:
-    """
-    if type(score_func) == str:
-        score_func = function_dict[score_func]
-    selected_variables = []
-    for i in range(iterations):
-        selected_variables += feature_selection_list(X=x, y=y, k=initial_k, score_func=score_func)
-    count = dict.fromkeys(selected_variables)
-    for var in count.keys():
-        count[var] = selected_variables.count(var)
-    sorted_count = dict(sorted(count.items(), key=lambda x: x[1], reverse=True))
-    final_variables = list(sorted_count.keys())[:final_k]
-    best_features_dataframe = x.iloc[:, final_variables]
-    # best_features_dataframe[frailty_variable] = y
-    return best_features_dataframe
-
-
-def joint_feature_selection_df(X, y, score_functions=[chi2, f_classif, mutual_info_classif], k=100, print_selected=False):
-    """
-    Performs feature selection with different score function and then joins the obtained dataframes.
-
-    :param X: {pandas DataFrame} (n_samples, n_features)
-    :param y: {numpy array} (n_samples) frailty target variable
-    :param score_functions: {list of string or function} statistical functions to use to rate the k-best variables
-    :param k: {int} number of variables to select at each iteration, default=100
-    :return: {pandas DataFrame} (n_samples, k <= n_features <= k * len(score_functions)) filtered dataframe containing
-            the union set of the best variables
-    """
-
-    selected_variables = []
-    for function in score_functions:
-        selected_variables += feature_selection_list(X=X, y=y, score_func=function, k=k)
-    selected_variables = list(set(selected_variables))
-    if print_selected:
-        print(X.iloc[:, selected_variables].columns)
-    return X.iloc[:, selected_variables]
-
-
-def save_selected_df(selected_X, y, frailty_column_name="FFP", function="", k="", iterations="",
-                     folder="data/best_features/", wave=""):
-    """
-    Save a .tab file after variable selection
-
-    :param selected_X: {pandas DataFrame} (n_samples, n_features) dataframe to save as a .tab file
-    :param function: {string} statistical function used for feature selection, default=""
-    :param k: {string o int} number of selected variables, default=""
-    :param folder: {string} path to the folder where the dataframe should be saved
-    :return: selected_frailty_dataframe {pandas DataFrame} the same dataframe given as input
-    """
-
-    saving_X = selected_X.copy()
-    saving_X[frailty_column_name] = y
-    if iterations == "":
-        saving_X.to_csv(
-            folder + str(wave) + "_frailty_selected_" + str(k) + "_features_" + str(function) + ".tab",
-            sep='\t', index_label='idauniq', quoting=3, escapechar='\\')
-    else:
-        saving_X.to_csv(
-            folder + str(wave) + "_frailty_selected_" + str(k) + "_features_" + str(function) + "_" + str(
-                iterations) + "_iterations" + ".tab",
-            sep='\t', index_label='idauniq', quoting=3, escapechar='\\')
-    return selected_X
+    selector = multisurf.MultiSURF(n_features_to_select=n_features, discrete_threshold=discrete_threshold, n_jobs=n_jobs)
+    X_test = X.copy().to_numpy()
+    y_test = y.copy().to_numpy()
+    selector = selector.fit(X=X_test, y=y_test)
+    selected_vars = list(selector.top_features_)
+    X_surf = X.iloc[:, selected_vars[:n_features]]
+    if save_features:
+        vars = pd.DataFrame(data=np.array(X_surf.columns).reshape(1, n_features))
+        vars.to_csv(file_path, sep='\t', escapechar='\\')
+    return X_surf, y
 
 
 if __name__ == '__main__':
-    print("Starting process...")
-
-    fried = pd.read_csv(filepath_or_buffer='data/raw/wave_6_frailty_FFP_data.tab', sep='\t', lineterminator='\n',
-                        header=0, low_memory=False, index_col="idauniq")
-    print(fried.shape)
-    frailty_variable = "FFP"
+    # Load wave 6 and 5
+    X_w6, y_w6 = load_data(file_name="wave_6_frailty_FFP_data.tab", folder_path="data/raw/", target_variable="FFP",
+                     index="idauniq")
+    data_file_w5 = "wave_5_elsa_data_v4.tab"
+    X_w5 = load_w5(core_data_path="data/raw/" + str(data_file_w5), index_col='idauniq', acceptable_features=None,
+                acceptable_idauniq=X_w6.index, drop_frailty_columns=False)
+    y_w5 = y_w6.loc[X_w5.index]
+    y_w5.sort_index(inplace=True)
+    X_w5.sort_index(inplace=True)
     # Preprocess data
-    fried = replace_missing_values_w6(frailty_dataframe=fried, replace_nan=True, replace_negatives=True)
-    fried = remove_constant_features(fried)
-    # Grouping frailty with pre-frailty to make the dataset balanced
-    fried = group_pre_frailty(frailty_dataframe=fried, frailty_variable=frailty_variable)
-    print("Non-frail: " + str(fried.loc[fried[frailty_variable] == 0].shape))
-    print("frail: " + str(fried.loc[fried[frailty_variable] == 1].shape))
-    X, y = separate_target_variable(df=fried, target_variable=frailty_variable)
-    X = min_max_scaling(X=X)
-    # Feature selection
-    k = 30
-    selection_functions = ["chi2", "f_classif", "mutual_info_classif"]  # ["chi2", "f_classif", "mutual_info_classif"]
-    selected_X = joint_feature_selection_df(X=X, y=y, score_functions=selection_functions, k=k)
-    save_selected_df(selected_X=selected_X, y=y, frailty_column_name=frailty_variable,
-                     function="_".join([str(f) for f in selection_functions]), k=selected_X.shape[1],
-                     folder="data/best_features/", wave="w6")
-    print(selected_X.shape)
-    print(selected_X.columns)
-
-    print("All done!")
+    X_w6, y_w6 = preprocess_frailty_db(X=X_w6, y=y_w6, replace_missing_value=True, regex_list=None,
+                                       replace_negatives=np.nan, replace_nan=None, rm_constant_features=True, min_max=True, group_frailty=True)
+    X_w5, y_w5 = preprocess_frailty_db(X=X_w5, y=y_w5, replace_missing_value=True, regex_list=None,
+                                       replace_negatives=np.nan, replace_nan=None, rm_constant_features=True,
+                                       min_max=True, group_frailty=True)
+    # Select and save best variables
+    n_features=50
+    multisurf_feature_selection(X=X_w6, y=y_w6, n_features=n_features, discrete_threshold=20, n_jobs=-1, save_features=True,
+                                file_path="data/best_features/wave_6_features.tab")
+    multisurf_feature_selection(X=X_w5, y=y_w5, n_features=n_features, discrete_threshold=20, n_jobs=-1, save_features=True,
+                                file_path="data/best_features/wave_5_features.tab")
