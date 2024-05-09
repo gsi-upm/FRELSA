@@ -15,11 +15,11 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 # Dictionary of classifiers to be used for the baseline
 classifiers = {"SVM_linear": [SVC(kernel='linear'), {'C': [0.1, 1, 10]}],
                "SVM_rbf": [SVC(kernel='rbf'), {'C': [0.1, 1, 10], 'gamma': [0.01, 0.1]}],
-               # "MLP": [MLPClassifier(),
-               #         {'hidden_layer_sizes': [(100, 50,), (100, 75, 25,), (100, 100, 75, 50, 25,)],
-               #          'activation': ['tanh', 'relu'], 'alpha': [0.001, 0.0001], 'max_iter': [2000]}],
-               # "DT": [DecisionTreeClassifier(), {'max_depth': [5, 10, 20]}],
-               # "RF": [RandomForestClassifier(), {'max_depth': [5, 10, 20], 'n_estimators': [20, 50, 100]}],
+               "MLP": [MLPClassifier(),
+                       {'hidden_layer_sizes': [(100, 50,), (100, 75, 25,), (100, 100, 75, 50, 25,)],
+                        'activation': ['tanh', 'relu'], 'alpha': [0.001, 0.0001], 'max_iter': [2000]}],
+               "DT": [DecisionTreeClassifier(), {'max_depth': [5, 10, 20]}],
+               "RF": [RandomForestClassifier(), {'max_depth': [5, 10, 20], 'n_estimators': [20, 50, 100]}],
                "LR": [LogisticRegression(), {'C': [0.1, 1, 10], 'max_iter': [2000]}]
                }
 
