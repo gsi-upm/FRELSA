@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 from skrebate import multisurf
 
-from models import load_data
-
 pd.options.mode.chained_assignment = None
 
 
@@ -157,6 +155,25 @@ def group_pre_frailty(y):
     return y
 
 
+def load_data(file_name, folder_path='data/best_features/', target_variable='FFP', index=None):
+    """
+    Loads a Dataframe and returns X and y
+
+    :param file_name: {str} name of the .tab file containing the dataframe with target variable
+    :param folder_path: {str} path to the folder containing the file
+    :param target_variable: {str} name of the target variable y inside the df in file
+    :param index: {str} name of the index column
+    :return: X {pandas DataFrame} (n_samples, n_features), y {numpy array} (n_samples)
+    """
+    if index is None:
+        df = pd.read_csv(filepath_or_buffer=folder_path + file_name, sep='\t', lineterminator='\n', header=0,
+                         low_memory=False)
+    else:
+        df = pd.read_csv(filepath_or_buffer=folder_path + file_name, sep='\t', lineterminator='\n', header=0,
+                         low_memory=False, index_col=index)
+    return separate_target_variable(df=df, target_variable=target_variable)
+
+
 def replace_missing_values_w6(frailty_dataframe, regex_list=None, replace_negatives=None, replace_nan=None):
     """
     Replaces nan entries, str entries and negative floats with 0
@@ -243,11 +260,9 @@ def separate_target_variable(df, target_variable="FFP"):
     :return: {pandas DataFrame} (n_samples, n_features), {np array} (n_samples): X, y
     """
 
-    variables = list(df.columns.values)
-    variables.remove(target_variable)
-    X = df.loc[:, variables]
     y = df.loc[:, target_variable]
-    return X, y
+    df.drop(target_variable, axis=1, inplace=True)
+    return df, y
 
 
 def multisurf_feature_selection(X, y, n_features=50, discrete_threshold=20, n_jobs=1, save_features=False, file_path=None):
