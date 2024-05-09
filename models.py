@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from preprocess import separate_target_variable, preprocess_frailty_db, load_w5
+from preprocess import separate_target_variable, preprocess_frailty_db, load_w5, load_data
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -15,32 +15,13 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 # Dictionary of classifiers to be used for the baseline
 classifiers = {"SVM_linear": [SVC(kernel='linear'), {'C': [0.1, 1, 10]}],
                "SVM_rbf": [SVC(kernel='rbf'), {'C': [0.1, 1, 10], 'gamma': [0.01, 0.1]}],
-               "MLP": [MLPClassifier(),
-                       {'hidden_layer_sizes': [(100, 50,), (100, 75, 25,), (100, 100, 75, 50, 25,)],
-                        'activation': ['tanh', 'relu'], 'alpha': [0.001, 0.0001], 'max_iter': [2000]}],
-               "DT": [DecisionTreeClassifier(), {'max_depth': [5, 10, 20]}],
-               "RF": [RandomForestClassifier(), {'max_depth': [5, 10, 20], 'n_estimators': [20, 50, 100]}],
+               # "MLP": [MLPClassifier(),
+               #         {'hidden_layer_sizes': [(100, 50,), (100, 75, 25,), (100, 100, 75, 50, 25,)],
+               #          'activation': ['tanh', 'relu'], 'alpha': [0.001, 0.0001], 'max_iter': [2000]}],
+               # "DT": [DecisionTreeClassifier(), {'max_depth': [5, 10, 20]}],
+               # "RF": [RandomForestClassifier(), {'max_depth': [5, 10, 20], 'n_estimators': [20, 50, 100]}],
                "LR": [LogisticRegression(), {'C': [0.1, 1, 10], 'max_iter': [2000]}]
                }
-
-
-def load_data(file_name, folder_path='data/best_features/', target_variable='FFP', index=None):
-    """
-    Loads a Dataframe and returns X and y
-
-    :param file_name: {str} name of the .tab file containing the dataframe with target variable
-    :param folder_path: {str} path to the folder containing the file
-    :param target_variable: {str} name of the target variable y inside the df in file
-    :param index: {str} name of the index column
-    :return: X {pandas DataFrame} (n_samples, n_features), y {numpy array} (n_samples)
-    """
-    if index is None:
-        df = pd.read_csv(filepath_or_buffer=folder_path + file_name, sep='\t', lineterminator='\n', header=0,
-                         low_memory=False)
-    else:
-        df = pd.read_csv(filepath_or_buffer=folder_path + file_name, sep='\t', lineterminator='\n', header=0,
-                         low_memory=False, index_col=index)
-    return separate_target_variable(df=df, target_variable=target_variable)
 
 
 def get_cv_metrics(X, y, scoring=['accuracy', 'precision_macro', 'f1_macro', 'recall_macro'], voting_classifier=False,
@@ -160,7 +141,7 @@ if __name__ == '__main__':
     # Load wave 5 data
     data_file = "wave_5_elsa_data_v4.tab"
     X = load_w5(core_data_path="data/raw/" + str(data_file), index_col='idauniq', acceptable_features=None,
-                acceptable_idauniq=df_w6.index, drop_frailty_columns=False)
+                acceptable_idauniq=df_w6.index, drop_frailty_columns=None)
     prediction_multisurf_variables = pd.read_csv("data/best_features/wave_5_features.tab",
                                                  sep='\t', escapechar='\\')['0'].tolist()
     X = X.loc[:, prediction_multisurf_variables]
