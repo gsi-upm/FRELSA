@@ -3,8 +3,9 @@
 *.tab
 *.txt
 *.mat
-*.ipynb
+Data_manipulation.ipynb
 *.sav
 __pycache__
 .*
 data
+img
