@@ -121,8 +121,8 @@ if __name__ == '__main__':
     epochs = 1000
 
     # Train models and save results
-    saved_model_path = "data/models/detection/test"
-    saved_results_path = "data/metrics/detection_test_results"
+    saved_model_path = "data/models/detection/model"
+    saved_results_path = "data/metrics/results"
     get_cv_metrics(X=X, y=y, scoring=scoring, voting_classifier=True, random_state=seed, epochs=epochs, cv=folds,
                    results_file_path=saved_results_path, model_file_path=saved_model_path, n_jobs=-1)
 
@@ -165,8 +165,8 @@ if __name__ == '__main__':
     epochs = 1000
 
     # Train models and save results
-    saved_model_path = "data/models/prediction/test"
-    saved_results_path = "data/metrics/prediction_test_results"
+    saved_model_path = "data/models/prediction/model"
+    saved_results_path = "data/metrics/results"
     get_cv_metrics(X=X, y=y, scoring=scoring, voting_classifier=True, random_state=seed, epochs=epochs, cv=folds,
                    results_file_path=saved_results_path, model_file_path=saved_model_path, n_jobs=-1)
 
