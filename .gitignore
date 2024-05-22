@@ -3,7 +3,7 @@
 *.tab
 *.txt
 *.mat
-*.ipynb
+Data_manipulation.ipynb
 *.sav
 __pycache__
 .*
