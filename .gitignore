@@ -1,7 +1,6 @@
 *.log
 *.csv
 *.tab
-*.txt
 *.mat
 Data_manipulation.ipynb
 *.sav
